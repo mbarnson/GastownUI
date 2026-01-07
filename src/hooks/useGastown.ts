@@ -12,7 +12,7 @@ import type {
 } from '../types/gastown'
 
 // Helper to run gt/bd commands via Tauri
-async function runCommand(cmd: string, args: string[]): Promise<CommandResult> {
+export async function runCommand(cmd: string, args: string[]): Promise<CommandResult> {
   return invoke<CommandResult>('run_gt_command', { cmd, args })
 }
 
