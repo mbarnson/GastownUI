@@ -86,6 +86,14 @@ export default function Header() {
             <span className="font-medium">Home</span>
           </Link>
 
+          {/* Gas Town Section */}
+          <div className="mt-4 mb-2 px-3">
+            <div className="flex items-center gap-2 text-orange-400 text-sm font-semibold uppercase tracking-wider">
+              <Flame size={14} />
+              Gas Town
+            </div>
+          </div>
+
           <Link
             to="/dashboard"
             onClick={() => setIsOpen(false)}
@@ -111,14 +119,6 @@ export default function Header() {
             <Terminal size={20} />
             <span className="font-medium">Tmux Sessions</span>
           </Link>
-
-          {/* Gas Town Section */}
-          <div className="mt-4 mb-2 px-3">
-            <div className="flex items-center gap-2 text-orange-400 text-sm font-semibold uppercase tracking-wider">
-              <Flame size={14} />
-              Gas Town
-            </div>
-          </div>
 
           <div className="flex flex-row justify-between">
             <div className="flex-1 flex items-center gap-3 p-3 text-slate-200">
