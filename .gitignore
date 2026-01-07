@@ -1,1 +1,24 @@
-vendor
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+count.txt
+.env
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+todos.json
+
+# Tauri
+src-tauri/target
+src-tauri/gen/schemas
+
+# Models (large GGUF files)
+models/*.gguf
+
+# Runtime state
+.runtime
+.cta.json
