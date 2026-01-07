@@ -4,6 +4,8 @@ import { useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  Factory,
+  Flame,
   Home,
   Menu,
   Network,
@@ -11,12 +13,15 @@ import {
   StickyNote,
   X,
 } from 'lucide-react'
+import { useRigs } from '../hooks/useGastown'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [groupedExpanded, setGroupedExpanded] = useState<
     Record<string, boolean>
   >({})
+  // Only fetch rigs on client side (Tauri APIs not available during SSR)
+  const { data: rigs = [] } = useRigs()
 
   return (
     <>
@@ -68,6 +73,60 @@ export default function Header() {
             <Home size={20} />
             <span className="font-medium">Home</span>
           </Link>
+
+          {/* Gas Town Section */}
+          <div className="mt-4 mb-2 px-3">
+            <div className="flex items-center gap-2 text-orange-400 text-sm font-semibold uppercase tracking-wider">
+              <Flame size={14} />
+              Gas Town
+            </div>
+          </div>
+
+          <div className="flex flex-row justify-between">
+            <div className="flex-1 flex items-center gap-3 p-3 text-gray-300">
+              <Factory size={20} className="text-orange-400" />
+              <span className="font-medium">Rigs</span>
+            </div>
+            <button
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              onClick={() =>
+                setGroupedExpanded((prev) => ({
+                  ...prev,
+                  Rigs: !prev.Rigs,
+                }))
+              }
+            >
+              {groupedExpanded.Rigs ? (
+                <ChevronDown size={20} />
+              ) : (
+                <ChevronRight size={20} />
+              )}
+            </button>
+          </div>
+          {groupedExpanded.Rigs && (
+            <div className="flex flex-col ml-4">
+              {rigs.length === 0 ? (
+                <div className="p-3 text-gray-500 text-sm">No rigs found</div>
+              ) : (
+                rigs.map((rig) => (
+                  <Link
+                    key={rig}
+                    to="/rig/$rigId"
+                    params={{ rigId: rig }}
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-1"
+                    activeProps={{
+                      className:
+                        'flex items-center gap-3 p-3 rounded-lg bg-orange-600 hover:bg-orange-700 transition-colors mb-1',
+                    }}
+                  >
+                    <Factory size={16} />
+                    <span className="font-medium">{rig}</span>
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
 
           {/* Demo Links Start */}
 
