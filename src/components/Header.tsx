@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  Factory,
   Home,
   Menu,
   Network,
@@ -67,6 +68,19 @@ export default function Header() {
           >
             <Home size={20} />
             <span className="font-medium">Home</span>
+          </Link>
+
+          <Link
+            to="/dashboard"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-orange-600 hover:bg-orange-700 transition-colors mb-2',
+            }}
+          >
+            <Factory size={20} />
+            <span className="font-medium">Gas Town Dashboard</span>
           </Link>
 
           {/* Demo Links Start */}
