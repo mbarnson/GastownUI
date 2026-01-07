@@ -20,6 +20,10 @@ pub fn run() {
             gastown::run_gt_command,
             gastown::read_beads_file,
             gastown::list_tmux_sessions,
+            gastown::get_tmux_panes,
+            gastown::capture_tmux_pane,
+            gastown::get_session_details,
+            gastown::attach_tmux_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
