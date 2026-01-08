@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import Header from '../components/Header'
 import SkipLink from '../components/SkipLink'
+import VoiceControlOverlay from '../components/VoiceControlOverlay'
 
 import appCss from '../styles.css?url'
 
@@ -53,6 +54,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <main id="main-content" tabIndex={-1} className="outline-none">
             {children}
           </main>
+          <VoiceControlOverlay />
         </QueryClientProvider>
         <Scripts />
       </body>
