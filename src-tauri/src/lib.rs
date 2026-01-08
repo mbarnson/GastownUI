@@ -1,6 +1,8 @@
+mod events;
 mod gastown;
 mod voice;
 
+use events::EventsWatcherState;
 use voice::VoiceServerState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -10,6 +12,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .manage(VoiceServerState::default())
+        .manage(EventsWatcherState::default())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -34,6 +37,12 @@ pub fn run() {
             voice::send_voice_input,
             voice::send_text_to_speech,
             voice::transcribe_audio,
+            events::start_events_watcher,
+            events::stop_events_watcher,
+            events::set_events_verbosity,
+            events::get_events_verbosity,
+            events::get_recent_events,
+            events::is_events_watcher_active,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
