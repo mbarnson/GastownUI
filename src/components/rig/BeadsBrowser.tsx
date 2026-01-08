@@ -27,6 +27,41 @@ import {
 import type { Bead } from '../../hooks/useGastown'
 import { focusRingClasses } from '../../lib/a11y'
 
+// Re-export Bead type
+export type { Bead }
+
+// Mock data for development
+export const mockBeads: Bead[] = [
+  {
+    id: 'ga-001',
+    title: 'Implement user authentication',
+    status: 'in_progress',
+    type: 'feature',
+    priority: 1,
+    assignee: 'GastownUI/slit',
+    created: '2026-01-07',
+    updated: '2026-01-07',
+  },
+  {
+    id: 'ga-002',
+    title: 'Fix dashboard loading state',
+    status: 'open',
+    type: 'bug',
+    priority: 2,
+    created: '2026-01-07',
+    updated: '2026-01-07',
+  },
+  {
+    id: 'ga-003',
+    title: 'Add voice command support',
+    status: 'closed',
+    type: 'feature',
+    priority: 1,
+    created: '2026-01-06',
+    updated: '2026-01-07',
+  },
+]
+
 interface BeadsBrowserProps {
   beads: Bead[]
   rigId: string

@@ -181,7 +181,7 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
   )
 }
 
-export function TmuxPanel() {
+export default function TmuxPanel() {
   const { data: sessions, isLoading, error, refetch } = useTmuxSessions()
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
 

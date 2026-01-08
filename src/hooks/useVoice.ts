@@ -278,6 +278,99 @@ export function useVoiceInteraction() {
   };
 }
 
+/**
+ * Hook for auto-starting voice server with loading progress
+ */
+export function useAutoStartVoice(autoStart: boolean = true) {
+  const { status, isStarting, start, error } = useVoiceServer();
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('Initializing...');
+
+  useEffect(() => {
+    if (autoStart && !status?.running && !isStarting) {
+      setLoadingMessage('Starting voice server...');
+      setLoadingProgress(10);
+      start();
+    }
+  }, [autoStart, status?.running, isStarting, start]);
+
+  useEffect(() => {
+    if (isStarting) {
+      setLoadingProgress(50);
+      setLoadingMessage('Loading models...');
+    } else if (status?.ready) {
+      setLoadingProgress(100);
+      setLoadingMessage('Ready');
+    }
+  }, [isStarting, status?.ready]);
+
+  return {
+    status,
+    isStarting,
+    loadingProgress,
+    loadingMessage,
+    error,
+  };
+}
+
+/**
+ * Hook for Voice Activity Detection (VAD) recording
+ */
+export function useVADRecorder() {
+  const [isListening, setIsListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const startListening = useCallback(async () => {
+    try {
+      setError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      setIsListening(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start listening');
+    }
+  }, []);
+
+  const stopListening = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsListening(false);
+    setIsRecording(false);
+  }, []);
+
+  const clearRecording = useCallback(() => {
+    setAudioBase64(null);
+    chunksRef.current = [];
+  }, []);
+
+  return {
+    isListening,
+    isRecording,
+    audioBase64,
+    error,
+    startListening,
+    stopListening,
+    clearRecording,
+  };
+}
+
 // Utility: Convert audio blob to WAV format
 async function convertToWav(blob: Blob): Promise<Blob> {
   const audioContext = new AudioContext({ sampleRate: 16000 });
