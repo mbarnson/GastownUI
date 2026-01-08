@@ -1,76 +1,5 @@
 @import "tailwindcss";
 
-/* Color Blind Mode CSS Variables (ga-7up) */
-:root {
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-info: #3b82f6;
-  --color-primary: #f43f5e;
-  --color-secondary: #8b5cf6;
-  --color-muted: #6b7280;
-}
-
-/* High contrast mode overrides */
-.high-contrast {
-  --color-success: #00ff00;
-  --color-warning: #ffff00;
-  --color-error: #ff0000;
-  --color-info: #00ffff;
-  --color-primary: #ff00ff;
-  --color-secondary: #ffffff;
-  --color-muted: #808080;
-}
-
-.high-contrast body {
-  background: #000000 !important;
-  color: #ffffff !important;
-}
-
-.high-contrast .bg-slate-800,
-.high-contrast .bg-slate-900,
-.high-contrast .bg-slate-800\/50 {
-  background-color: #000000 !important;
-  border-color: #ffffff !important;
-}
-
-.high-contrast .text-gray-400,
-.high-contrast .text-gray-500 {
-  color: #cccccc !important;
-}
-
-/* Pattern fills for charts and progress bars */
-.use-patterns .progress-fill {
-  background: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 4px,
-    currentColor 4px,
-    currentColor 8px
-  );
-}
-
-/* Status indicator styles using shapes */
-.status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.status-indicator::before {
-  font-size: 1em;
-  line-height: 1;
-}
-
-.status-success::before { content: '✓'; color: var(--color-success); }
-.status-warning::before { content: '⚠'; color: var(--color-warning); }
-.status-error::before { content: '✕'; color: var(--color-error); }
-.status-info::before { content: 'ℹ'; color: var(--color-info); }
-.status-pending::before { content: '○'; color: var(--color-muted); }
-.status-in-progress::before { content: '●'; color: var(--color-warning); }
-.status-blocked::before { content: '⊘'; color: var(--color-error); }
-.status-completed::before { content: '✓'; color: var(--color-success); }
-
 body {
   @apply m-0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
@@ -85,331 +14,101 @@ code {
     monospace;
 }
 
-/* Mac-native header palette with light/dark support */
-:root {
-  color-scheme: light dark;
-  --header-bg: #f5f5f7;
-  --header-border: #d1d1d6;
-  --header-text: #1c1c1e;
-  --header-muted: #6e6e73;
-  --header-accent: #d70015;
-  --header-pill-bg: rgba(52, 199, 89, 0.18);
-  --header-pill-text: #1f7a3b;
-  --header-hover: rgba(0, 0, 0, 0.06);
-  --header-query-bg: rgba(0, 122, 255, 0.16);
-  --header-query-text: #007aff;
-  --header-selftest-bg: rgba(255, 159, 10, 0.18);
-  --header-selftest-text: #b35c00;
-  --app-bg: #f5f5f7;
-  --app-surface: #ffffff;
-  --app-surface-alt: #f2f2f7;
-  --app-surface-strong: #e5e5ea;
-  --app-surface-deep: #d1d1d6;
-  --app-border: #d1d1d6;
-  --app-border-strong: #c7c7cc;
-  --app-text: #1c1c1e;
-  --app-text-strong: #2c2c2e;
-  --app-text-muted: #6e6e73;
-  --app-text-subtle: #8e8e93;
-  --app-text-faint: #aeaeb2;
-  --app-bg-50: rgba(245, 245, 247, 0.6);
-  --app-bg-70: rgba(245, 245, 247, 0.7);
-  --app-bg-80: rgba(245, 245, 247, 0.8);
-  --app-surface-30: rgba(255, 255, 255, 0.35);
-  --app-surface-50: rgba(255, 255, 255, 0.6);
-  --app-surface-70: rgba(255, 255, 255, 0.75);
-  --app-surface-80: rgba(255, 255, 255, 0.85);
-  --app-surface-90: rgba(255, 255, 255, 0.92);
-}
+/* ============================================================================
+   Windows High Contrast Mode Support
+   ============================================================================ */
 
-@media (prefers-color-scheme: dark) {
+/* High Contrast Mode CSS Variables */
+@media (forced-colors: active) {
   :root {
-    --header-bg: #1c1c1e;
-    --header-border: #2c2c2e;
-    --header-text: #f2f2f7;
-    --header-muted: #8e8e93;
-    --header-accent: #ff453a;
-    --header-pill-bg: rgba(48, 209, 88, 0.18);
-    --header-pill-text: #30d158;
-    --header-hover: rgba(255, 255, 255, 0.08);
-    --header-query-bg: rgba(10, 132, 255, 0.2);
-    --header-query-text: #0a84ff;
-    --header-selftest-bg: rgba(255, 159, 10, 0.2);
-    --header-selftest-text: #ff9f0a;
-    --app-bg: #1c1c1e;
-    --app-surface: #2c2c2e;
-    --app-surface-alt: #3a3a3c;
-    --app-surface-strong: #3a3a3c;
-    --app-surface-deep: #48484a;
-    --app-border: #3a3a3c;
-    --app-border-strong: #48484a;
-    --app-text: #f2f2f7;
-    --app-text-strong: #e5e5ea;
-    --app-text-muted: #8e8e93;
-    --app-text-subtle: #636366;
-    --app-text-faint: #48484a;
-    --app-bg-50: rgba(28, 28, 30, 0.6);
-    --app-bg-70: rgba(28, 28, 30, 0.7);
-    --app-bg-80: rgba(28, 28, 30, 0.8);
-    --app-surface-30: rgba(44, 44, 46, 0.35);
-    --app-surface-50: rgba(44, 44, 46, 0.6);
-    --app-surface-70: rgba(44, 44, 46, 0.75);
-    --app-surface-80: rgba(44, 44, 46, 0.85);
-    --app-surface-90: rgba(44, 44, 46, 0.92);
+    --color-text: CanvasText;
+    --color-text-muted: GrayText;
+    --color-text-link: LinkText;
+    --color-text-highlight: HighlightText;
+    --color-bg: Canvas;
+    --color-bg-highlight: Highlight;
+    --color-bg-button: ButtonFace;
+    --color-border: CanvasText;
+    --color-border-button: ButtonText;
+    --color-focus: Highlight;
+  }
+
+  /* Ensure all interactive elements have visible borders */
+  button,
+  [role="button"],
+  a,
+  [role="link"],
+  input,
+  select,
+  textarea {
+    border: 1px solid ButtonText !important;
+  }
+
+  /* Focus indicators must be highly visible */
+  :focus {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Focus-visible for keyboard navigation */
+  :focus-visible {
+    outline: 3px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Ensure icons are visible */
+  svg {
+    forced-color-adjust: auto;
+  }
+
+  /* Progress bars need visible borders */
+  [role="progressbar"] {
+    border: 1px solid CanvasText !important;
+  }
+
+  /* Progress bar fill needs to be visible */
+  [role="progressbar"] > div {
+    background-color: Highlight !important;
+  }
+
+  /* Cards and panels need borders */
+  section,
+  article,
+  aside {
+    border: 1px solid CanvasText !important;
+  }
+
+  /* Status indicators - ensure text labels are visible */
+  [role="status"] {
+    border: 1px solid CanvasText !important;
+  }
+
+  /* Ensure list items in navigation are distinguishable */
+  nav li,
+  [role="navigation"] li {
+    border-bottom: 1px solid GrayText;
+  }
+
+  /* Active/selected states */
+  [aria-current="page"],
+  [aria-selected="true"],
+  [aria-checked="true"] {
+    background-color: Highlight !important;
+    color: HighlightText !important;
+  }
+
+  /* Disabled states */
+  [disabled],
+  [aria-disabled="true"] {
+    color: GrayText !important;
+    border-color: GrayText !important;
   }
 }
 
-body {
-  background-color: var(--app-bg);
-  color: var(--app-text);
-}
+/* ============================================================================
+   Reduced Motion Support
+   ============================================================================ */
 
-/* Global macOS palette remap for core slate/gray utilities */
-.bg-slate-950,
-.bg-slate-900,
-.bg-slate-850 {
-  background-color: var(--app-bg) !important;
-}
-
-.bg-slate-800 {
-  background-color: var(--app-surface) !important;
-}
-
-.bg-slate-750,
-.bg-slate-700 {
-  background-color: var(--app-surface-alt) !important;
-}
-
-.bg-slate-650,
-.bg-slate-600 {
-  background-color: var(--app-surface-deep) !important;
-}
-
-.bg-slate-500 {
-  background-color: var(--app-surface-strong) !important;
-}
-
-.bg-slate-400 {
-  background-color: var(--app-border) !important;
-}
-
-.bg-slate-900\/80 {
-  background-color: var(--app-bg-80) !important;
-}
-
-.bg-slate-900\/70 {
-  background-color: var(--app-bg-70) !important;
-}
-
-.bg-slate-900\/50 {
-  background-color: var(--app-bg-50) !important;
-}
-
-.bg-slate-800\/90 {
-  background-color: var(--app-surface-90) !important;
-}
-
-.bg-slate-800\/80 {
-  background-color: var(--app-surface-80) !important;
-}
-
-.bg-slate-800\/50 {
-  background-color: var(--app-surface-50) !important;
-}
-
-.bg-slate-800\/30 {
-  background-color: var(--app-surface-30) !important;
-}
-
-.bg-slate-700\/50 {
-  background-color: var(--app-surface-50) !important;
-}
-
-.bg-slate-700\/30 {
-  background-color: var(--app-surface-30) !important;
-}
-
-.bg-slate-500\/20,
-.bg-slate-400\/20 {
-  background-color: var(--app-surface-30) !important;
-}
-
-.bg-gray-900 {
-  background-color: var(--app-bg) !important;
-}
-
-.bg-gray-800 {
-  background-color: var(--app-surface-alt) !important;
-}
-
-.bg-gray-600 {
-  background-color: var(--app-surface-deep) !important;
-}
-
-.bg-gray-500\/20,
-.bg-gray-400\/20 {
-  background-color: var(--app-surface-30) !important;
-}
-
-.text-white,
-.text-slate-100,
-.text-slate-200,
-.text-gray-200 {
-  color: var(--app-text) !important;
-}
-
-.text-slate-300,
-.text-gray-300 {
-  color: var(--app-text-strong) !important;
-}
-
-.text-slate-400,
-.text-gray-400 {
-  color: var(--app-text-muted) !important;
-}
-
-.text-slate-500,
-.text-gray-500 {
-  color: var(--app-text-subtle) !important;
-}
-
-.text-slate-600,
-.text-gray-600 {
-  color: var(--app-text-faint) !important;
-}
-
-.border-slate-800,
-.border-slate-700,
-.border-slate-700\/50,
-.border-slate-700\/30,
-.border-gray-700 {
-  border-color: var(--app-border) !important;
-}
-
-.border-slate-600,
-.border-slate-600\/50,
-.border-slate-500,
-.border-slate-500\/50 {
-  border-color: var(--app-border-strong) !important;
-}
-
-.from-slate-950,
-.from-slate-900 {
-  --tw-gradient-from: var(--app-bg) !important;
-  --tw-gradient-to: var(--app-bg) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
-}
-
-.via-slate-900 {
-  --tw-gradient-stops: var(--tw-gradient-from), var(--app-surface), var(--tw-gradient-to) !important;
-}
-
-.via-slate-800 {
-  --tw-gradient-stops: var(--tw-gradient-from), var(--app-surface-alt), var(--tw-gradient-to) !important;
-}
-
-.from-slate-600 {
-  --tw-gradient-from: var(--app-surface-strong) !important;
-  --tw-gradient-to: var(--app-surface-strong) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
-}
-
-.to-slate-950,
-.to-slate-900 {
-  --tw-gradient-to: var(--app-bg) !important;
-}
-
-.to-slate-700 {
-  --tw-gradient-to: var(--app-surface-alt) !important;
-}
-
-/* Keyboard Accessibility - Focus Styles (ga-1fk) */
-
-/* Show focus outline only for keyboard navigation */
-:focus-visible {
-  outline: 2px solid #f43f5e; /* rose-500 */
-  outline-offset: 2px;
-}
-
-/* Remove default focus outline when using mouse */
-:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Enhanced focus for buttons and interactive elements */
-button:focus-visible,
-a:focus-visible,
-[role="button"]:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid #f43f5e;
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* Focus ring for form inputs */
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid #f43f5e;
-  outline-offset: 1px;
-  border-color: #f43f5e;
-}
-
-/* Skip to main content link (appears on tab) */
-.skip-link {
-  position: absolute;
-  top: -100px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 8px 16px;
-  background: #f43f5e;
-  color: white;
-  border-radius: 0 0 8px 8px;
-  z-index: 9999;
-  transition: top 0.2s;
-}
-
-.skip-link:focus {
-  top: 0;
-}
-
-/* Ensure sufficient color contrast for focus states */
-.bg-slate-800 button:focus-visible,
-.bg-slate-900 button:focus-visible {
-  box-shadow: 0 0 0 2px #f43f5e;
-}
-
-/* High contrast focus for dark backgrounds */
-.dark-focus:focus-visible {
-  outline-color: #fb7185; /* rose-400 for better visibility */
-}
-
-/* Keyboard navigation indicator for lists */
-[role="listbox"] [role="option"]:focus,
-[role="menu"] [role="menuitem"]:focus {
-  background-color: rgba(244, 63, 94, 0.1);
-  outline: none;
-}
-
-/* Focus trap prevention - ensure focusable elements are visible */
-[tabindex="-1"]:focus {
-  outline: none;
-}
-
-/* Screen reader only utility */
-.sr-only:not(:focus):not(:focus-within) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-/* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -419,50 +118,22 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
 
-/* Calm mode class - can be toggled manually */
-.calm-mode *,
-.calm-mode *::before,
-.calm-mode *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-  scroll-behavior: auto !important;
-}
+  /* Keep essential loading indicators but make them static */
+  .animate-pulse {
+    animation: none !important;
+    opacity: 0.7;
+  }
 
-/* Motion-safe animations - only run when motion is allowed */
-.motion-safe-animate {
-  animation-play-state: running;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .motion-safe-animate {
-    animation-play-state: paused;
-    animation: none;
+  .animate-spin {
+    animation: none !important;
   }
 }
 
-.calm-mode .motion-safe-animate {
-  animation-play-state: paused;
-  animation: none;
-}
+/* ============================================================================
+   Screen Reader Only Utility (for announcements)
+   ============================================================================ */
 
-/* Fade-only transitions for reduced motion */
-.motion-reduce-fade {
-  transition: opacity 150ms ease-in-out !important;
-}
-
-/* Static progress indicator styles */
-.progress-static {
-  animation: none !important;
-}
-
-.progress-static::after {
-  content: none !important;
-}
-
-/* Screen reader only - visually hidden but accessible */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -475,45 +146,15 @@ textarea:focus-visible {
   border: 0;
 }
 
-/* Focusable screen reader content - visible on focus */
+/* Allow sr-only elements to be focusable for skip links */
 .sr-only-focusable:focus,
-.sr-only-focusable:focus-within {
+.sr-only-focusable:active {
   position: static;
   width: auto;
   height: auto;
-  padding: inherit;
-  margin: inherit;
+  padding: 0.5rem 1rem;
+  margin: 0;
   overflow: visible;
   clip: auto;
   white-space: normal;
-}
-
-/* Focus visible outline for keyboard navigation */
-.focus-visible-outline:focus-visible {
-  outline: 2px solid #22d3ee;
-  outline-offset: 2px;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  button,
-  a,
-  input,
-  select,
-  textarea {
-    border: 2px solid currentColor !important;
-  }
-
-  :focus {
-    outline: 3px solid currentColor !important;
-    outline-offset: 2px;
-  }
-}
-
-/* Forced colors mode support (Windows High Contrast) */
-@media (forced-colors: active) {
-  button,
-  a {
-    forced-color-adjust: none;
-  }
 }

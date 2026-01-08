@@ -34,6 +34,7 @@ import {
   getLandmarkProps,
 } from '../lib/voiceover'
 import { focusRingClasses } from '../lib/a11y'
+import { useReducedMotion, useHighContrast } from '../lib/windowsA11y'
 
 export const Route = createFileRoute('/dashboard')({ component: Dashboard })
 
@@ -67,6 +68,13 @@ function Dashboard() {
 
   // Announce convoy progress changes to screen readers
   useConvoyProgressAnnouncer(convoys)
+
+  // Windows accessibility: detect reduced motion and high contrast
+  const reducedMotion = useReducedMotion()
+  const { isHighContrast } = useHighContrast()
+
+  // Adjust animation classes based on user preferences
+  const pulseClass = reducedMotion ? 'opacity-70' : 'animate-pulse'
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-6">
