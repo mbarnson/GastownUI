@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Terminal,
   Copy,
+  Check,
   ExternalLink,
   Circle,
   RefreshCw,
@@ -18,11 +19,11 @@ import {
 import { TerminalPreview } from './TerminalPreview'
 import type { SessionHealth, TmuxSession } from '../types/tmux'
 
-const healthColors: Record<SessionHealth, { dot: string; text: string; label: string }> = {
-  active: { dot: 'text-green-400', text: 'text-green-400', label: 'Active' },
-  processing: { dot: 'text-yellow-400', text: 'text-yellow-400', label: 'Processing' },
-  idle: { dot: 'text-slate-400', text: 'text-slate-400', label: 'Idle' },
-  stuck: { dot: 'text-red-400', text: 'text-red-400', label: 'Stuck' },
+const healthColors: Record<SessionHealth, { dot: string; text: string; label: string; tooltip: string }> = {
+  active: { dot: 'text-green-400', text: 'text-green-400', label: 'Active', tooltip: 'Session is actively responding' },
+  processing: { dot: 'text-yellow-400', text: 'text-yellow-400', label: 'Processing', tooltip: 'Running a command or task' },
+  idle: { dot: 'text-slate-400', text: 'text-slate-400', label: 'Idle', tooltip: 'Session is idle at shell prompt' },
+  stuck: { dot: 'text-red-400 animate-pulse', text: 'text-red-400', label: 'Stuck', tooltip: 'Session may be stuck - no recent activity' },
 }
 
 interface SessionCardProps {
@@ -42,6 +43,15 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
   )
   const attachMutation = useAttachTmuxSession()
   const copyMutation = useCopyConnectionString()
+  const [copySuccess, setCopySuccess] = useState(false)
+
+  // Reset copy success after 2 seconds
+  useEffect(() => {
+    if (copySuccess) {
+      const timer = setTimeout(() => setCopySuccess(false), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [copySuccess])
 
   const health = details?.health ?? 'idle'
   const colors = healthColors[health]
@@ -52,7 +62,9 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
   }
 
   const handleCopy = () => {
-    copyMutation.mutate(connectionString)
+    copyMutation.mutate(connectionString, {
+      onSuccess: () => setCopySuccess(true),
+    })
   }
 
   return (
@@ -76,7 +88,7 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" title={colors.tooltip}>
           <Circle className={`w-3 h-3 fill-current ${colors.dot}`} />
           <span className={`text-sm ${colors.text}`}>{colors.label}</span>
         </div>
@@ -126,10 +138,15 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
             </button>
             <button
               onClick={handleCopy}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition-colors"
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                copySuccess
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+              }`}
+              title="Copy connection string to clipboard"
             >
-              <Copy className="w-4 h-4" />
-              {copyMutation.isSuccess ? 'Copied!' : 'Copy'}
+              {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copySuccess ? 'Copied!' : 'Copy'}
             </button>
           </div>
 
