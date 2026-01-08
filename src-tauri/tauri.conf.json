@@ -32,6 +32,23 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libappindicator3-1"],
+        "section": "utils",
+        "priority": "optional"
+      },
+      "rpm": {
+        "release": "1",
+        "epoch": "0"
+      },
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
+    "category": "Development",
+    "shortDescription": "Cross-platform GUI for Gas Town agent orchestration",
+    "longDescription": "GastownUI provides a visual interface for managing Gas Town multi-agent orchestration system. Features voice control, real-time monitoring, and tmux session management."
   }
 }

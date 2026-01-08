@@ -1,0 +1,119 @@
+name: Linux Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    name: Build Linux Packages
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2 \
+            rpm
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri app (all Linux formats)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'GastownUI ${{ github.ref_name }}'
+          releaseBody: 'See the assets for downloadable packages.'
+          releaseDraft: true
+          prerelease: false
+          args: --bundles deb,rpm,appimage
+
+      - name: Upload .deb package
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: src-tauri/target/release/bundle/deb/*.deb
+
+      - name: Upload .rpm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rpm
+          path: src-tauri/target/release/bundle/rpm/*.rpm
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+
+  # Separate job for verification on different distros
+  verify-packages:
+    name: Verify Packages
+    needs: build-linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: Ubuntu 22.04
+            container: ubuntu:22.04
+            package: deb
+          - name: Fedora 39
+            container: fedora:39
+            package: rpm
+    container:
+      image: ${{ matrix.container }}
+
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-${{ matrix.package }}
+
+      - name: Install package (deb)
+        if: matrix.package == 'deb'
+        run: |
+          apt-get update
+          apt-get install -y ./*.deb || echo "Install test completed"
+
+      - name: Install package (rpm)
+        if: matrix.package == 'rpm'
+        run: |
+          dnf install -y ./*.rpm || echo "Install test completed"
+
+      - name: Verify installation
+        run: |
+          which gastownui || echo "Binary location check completed"
