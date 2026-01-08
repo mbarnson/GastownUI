@@ -1,8 +1,18 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import Header from '../components/Header'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5000,
+      retry: 1,
+    },
+  },
+})
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
 import { SidebarModeProvider } from '../contexts/SidebarModeContext'
@@ -42,13 +52,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <CalmModeProvider>
-        <SimplifyModeProvider>
-          <SidebarModeProvider>
-            <RootBody>{children}</RootBody>
-          </SidebarModeProvider>
-        </SimplifyModeProvider>
-      </CalmModeProvider>
+      <QueryClientProvider client={queryClient}>
+        <CalmModeProvider>
+          <SimplifyModeProvider>
+            <SidebarModeProvider>
+              <RootBody>{children}</RootBody>
+            </SidebarModeProvider>
+          </SimplifyModeProvider>
+        </CalmModeProvider>
+      </QueryClientProvider>
     </html>
   )
 }
