@@ -5,6 +5,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
+import SkipLink from '../components/SkipLink'
 
 import appCss from '../styles.css?url'
 
@@ -53,8 +54,11 @@ function RootBody({ children }: { children: React.ReactNode }) {
 
   return (
     <body className={isCalm ? 'calm-mode' : ''}>
+      <SkipLink />
       <Header />
-      {children}
+      <main id="main-content" tabIndex={-1} className="outline-none">
+        {children}
+      </main>
       <TanStackDevtools
         config={{
           position: 'bottom-right',
