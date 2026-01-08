@@ -20,8 +20,10 @@ import {
   useActivityFeed,
   useBeads,
 } from '../hooks/useGastown'
+import { useState } from 'react'
 import TmuxPanel from '../components/TmuxPanel'
 import QuickCreateModal, { useQuickCreate } from '../components/QuickCreateModal'
+import VoiceGasTown, { VoiceButton } from '../components/VoiceGasTown'
 import { formatShortcut, shortcuts } from '../hooks/useKeyboardShortcut'
 import type { Convoy, ActivityItem, Bead, TownStatus as TownStatusType } from '../types/gastown'
 
@@ -51,11 +53,23 @@ function DashboardContent() {
   const { data: activity, isLoading: activityLoading } = useActivityFeed()
   const { data: beads } = useBeads()
   const quickCreate = useQuickCreate()
+  const [showVoicePanel, setShowVoicePanel] = useState(false)
 
   const handleCreateBead = (bead: { title: string; type: string; priority: number }) => {
     // In production, this would call the API
     console.log('Creating bead:', bead)
     // Could add to activity feed or refetch beads
+  }
+
+  const handleVoiceCommand = async (command: string) => {
+    // In production, this would execute the actual gt/bd command
+    console.log('Executing voice command:', command)
+    // Simulate command execution
+    return new Promise<{ success: boolean; output?: string }>((resolve) => {
+      setTimeout(() => {
+        resolve({ success: true, output: `Executed: ${command}` })
+      }, 500)
+    })
   }
 
   return (
@@ -67,6 +81,22 @@ function DashboardContent() {
         onCreate={handleCreateBead}
         defaultRig="GastownUI"
       />
+
+      {/* Voice Panel (slide-over) */}
+      {showVoicePanel && (
+        <div className="fixed inset-y-0 right-0 w-full sm:w-96 z-50 p-4">
+          <VoiceGasTown
+            expanded={true}
+            onClose={() => setShowVoicePanel(false)}
+            onExecuteCommand={handleVoiceCommand}
+          />
+        </div>
+      )}
+
+      {/* Floating Voice Button */}
+      {!showVoicePanel && (
+        <VoiceButton onClick={() => setShowVoicePanel(true)} />
+      )}
 
       {/* Header */}
       <header className="flex items-center justify-between mb-8">
