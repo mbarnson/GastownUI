@@ -61,6 +61,21 @@ pub async fn run_gt_command(cmd: String, args: Vec<String>) -> Result<CommandRes
     })
 }
 
+/// Run a generic shell command (for setup detection)
+#[tauri::command]
+pub async fn run_shell_command(command: String, args: Vec<String>) -> Result<CommandResult, String> {
+    let output = Command::new(&command)
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to execute {}: {}", command, e))?;
+
+    Ok(CommandResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code().unwrap_or(-1),
+    })
+}
+
 /// Read a beads file (issues.jsonl or interactions.jsonl)
 #[tauri::command]
 pub async fn read_beads_file(path: String) -> Result<String, String> {

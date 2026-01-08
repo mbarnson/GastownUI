@@ -26,6 +26,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             gastown::run_gt_command,
+            gastown::run_shell_command,
             gastown::read_beads_file,
             gastown::list_tmux_sessions,
             gastown::get_tmux_panes,
