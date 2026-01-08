@@ -6,6 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import { getMailbox } from './mail'
 
 // Action types supported by the voice interface
 export type ActionType =
@@ -230,18 +231,29 @@ async function executeMail(action: ParsedAction): Promise<ActionResult> {
   }
 
   try {
-    // Execute gt mail send command via Tauri
+    // Use VoiceMailbox for consistent mail handling
+    const mailbox = getMailbox()
     const mailSubject = subject || 'Voice message'
     const mailBody = body || subject
 
-    await invoke('run_gt_command', {
-      args: ['mail', 'send', recipient, '-s', mailSubject, '-m', mailBody],
+    const success = await mailbox.send({
+      to: recipient,
+      subject: mailSubject,
+      body: mailBody,
     })
 
-    return {
-      success: true,
-      message: `Mail sent to ${recipient}`,
-      action,
+    if (success) {
+      return {
+        success: true,
+        message: `Mail sent to ${recipient}`,
+        action,
+      }
+    } else {
+      return {
+        success: false,
+        message: `Failed to send mail to ${recipient}`,
+        action,
+      }
     }
   } catch (error) {
     return {
@@ -294,14 +306,13 @@ async function executeAskMayor(action: ParsedAction): Promise<ActionResult> {
   }
 
   try {
-    // Send question to mayor via mail
-    await invoke('run_gt_command', {
-      args: ['mail', 'send', 'mayor/', '-s', 'Voice Query', '-m', question],
-    })
+    // Use VoiceMailbox for bidirectional communication with 30s timeout
+    const mailbox = getMailbox()
+    const response = await mailbox.askMayor(question)
 
     return {
       success: true,
-      message: 'Question sent to Mayor. Check inbox for response.',
+      message: response,
       action,
     }
   } catch (error) {

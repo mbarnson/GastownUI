@@ -7,6 +7,7 @@ import {
   hasActions,
   formatResultsForVoice,
 } from '../voice/actions';
+import { getMailbox, type MailMessage } from '../voice/mail';
 
 interface VoiceMessage {
   id: string;
@@ -48,6 +49,37 @@ export function VoiceInterface() {
       handleSendVoice(audioBase64);
     }
   }, [isRecording, audioBase64]);
+
+  // Start mail polling when voice server is ready
+  useEffect(() => {
+    if (!status?.ready) return;
+
+    const mailbox = getMailbox();
+
+    // Handle incoming mail notifications
+    const unsubscribe = mailbox.onNewMail(async (msg: MailMessage) => {
+      const announcement = mailbox.formatAnnouncement(msg);
+
+      // Add notification message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: 'assistant',
+          text: `📬 ${announcement}`,
+          timestamp: new Date(),
+        },
+      ]);
+    });
+
+    // Start polling for mail
+    mailbox.startPolling(5000);
+
+    return () => {
+      unsubscribe();
+      mailbox.stopPolling();
+    };
+  }, [status?.ready]);
 
   const handleSendVoice = async (audio: string) => {
     try {
