@@ -333,20 +333,38 @@ export function useTownStatus() {
   })
 }
 
-// Activity feed
-export function useActivityFeed() {
+// Activity event from backend
+export interface ActivityEvent {
+  timestamp: string
+  event_type: string  // "created", "closed", "updated", "merged", "claimed"
+  actor: string | null
+  target_id: string
+  target_title: string
+  details: string | null
+}
+
+// Activity feed - real-time event stream
+export function useActivityFeed(limit?: number) {
   return useQuery({
-    queryKey: ['activity'],
-    queryFn: async (): Promise<ActivityItem[]> => {
+    queryKey: ['activity', limit],
+    queryFn: async (): Promise<ActivityEvent[]> => {
       if (!isTauri()) {
-        return mockActivity
+        // Convert mock data to ActivityEvent format
+        return mockActivity.map((a) => ({
+          timestamp: a.timestamp,
+          event_type: a.type,
+          actor: a.actor || null,
+          target_id: a.bead_id || a.id,
+          target_title: a.message,
+          details: null,
+        }))
       }
 
-      // TODO: Read from beads interactions.jsonl
-      return []
+      return invoke<ActivityEvent[]>('get_activity_feed', { limit: limit || 50 })
     },
     refetchInterval: 3000,
     staleTime: 1000,
+    enabled: isBrowser,
   })
 }
 

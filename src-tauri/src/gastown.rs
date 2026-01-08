@@ -46,41 +46,6 @@ pub enum SessionHealth {
     Stuck,       // Potentially stuck (long-running with no output)
 }
 
-// Molecule/Workflow visualization types
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum StepStatus {
-    Pending,
-    Active,
-    Complete,
-    Failed,
-    Blocked,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MoleculeStep {
-    pub id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub status: StepStatus,
-    pub depends_on: Vec<String>,  // IDs of steps this depends on
-    pub assignee: Option<String>,
-    pub started_at: Option<u64>,
-    pub completed_at: Option<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Molecule {
-    pub id: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub status: String,
-    pub steps: Vec<MoleculeStep>,
-    pub created_at: Option<u64>,
-    pub updated_at: Option<u64>,
-}
-
 /// Run a gt or bd command and return the output
 #[tauri::command]
 pub async fn run_gt_command(cmd: String, args: Vec<String>) -> Result<CommandResult, String> {
@@ -354,236 +319,86 @@ pub async fn attach_tmux_session(session_name: String) -> Result<(), String> {
     Ok(())
 }
 
-// Molecule visualization commands
+// ===== Activity Feed =====
 
-/// List all molecules (workflow instances)
-#[tauri::command]
-pub async fn list_molecules() -> Result<Vec<Molecule>, String> {
-    // Use bd list to get molecule beads
-    let output = Command::new("bd")
-        .args(["list", "--type=molecule", "--json"])
-        .output()
-        .map_err(|e| format!("Failed to list molecules: {}", e))?;
-
-    if !output.status.success() {
-        // Try alternative without --json for parsing
-        let output = Command::new("bd")
-            .args(["list", "--type=molecule"])
-            .output()
-            .map_err(|e| format!("Failed to list molecules: {}", e))?;
-
-        // Parse text output
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let molecules: Vec<Molecule> = stdout
-            .lines()
-            .filter_map(|line| {
-                // Format: id [priority] [type] status - title
-                let parts: Vec<&str> = line.splitn(2, " - ").collect();
-                if parts.len() >= 2 {
-                    let prefix = parts[0];
-                    let title = parts[1];
-
-                    // Extract ID from prefix
-                    let id = prefix.split_whitespace().next().unwrap_or("").to_string();
-                    let status = if prefix.contains("open") { "open" }
-                        else if prefix.contains("in_progress") { "in_progress" }
-                        else if prefix.contains("closed") { "closed" }
-                        else { "unknown" };
-
-                    Some(Molecule {
-                        id,
-                        name: title.to_string(),
-                        description: None,
-                        status: status.to_string(),
-                        steps: vec![],  // Steps loaded separately
-                        created_at: None,
-                        updated_at: None,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        return Ok(molecules);
-    }
-
-    // Parse JSON output if available
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    serde_json::from_str(&stdout)
-        .map_err(|e| format!("Failed to parse molecules JSON: {}", e))
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityEvent {
+    pub timestamp: String,
+    pub event_type: String,      // "created", "closed", "updated", "merged", "claimed"
+    pub actor: Option<String>,   // Who did it
+    pub target_id: String,       // Issue ID
+    pub target_title: String,    // Issue title
+    pub details: Option<String>, // Extra info like close_reason
 }
 
-/// Get detailed molecule info with steps
+#[derive(Debug, Deserialize)]
+struct BeadsIssue {
+    id: String,
+    title: String,
+    status: String,
+    #[serde(default)]
+    assignee: Option<String>,
+    created_at: String,
+    created_by: Option<String>,
+    updated_at: String,
+    #[serde(default)]
+    closed_at: Option<String>,
+    #[serde(default)]
+    close_reason: Option<String>,
+}
+
+/// Get activity feed from beads issues
 #[tauri::command]
-pub async fn get_molecule_details(molecule_id: String) -> Result<Molecule, String> {
-    // Get molecule info using bd show
+pub async fn get_activity_feed(limit: Option<usize>) -> Result<Vec<ActivityEvent>, String> {
+    let max_events = limit.unwrap_or(50);
+
+    // Run bd list --json to get recent issues
     let output = Command::new("bd")
-        .args(["show", &molecule_id, "--json"])
+        .args(["list", "--json", "--limit", "100"])
         .output()
-        .map_err(|e| format!("Failed to get molecule: {}", e))?;
+        .map_err(|e| format!("Failed to run bd list: {}", e))?;
 
     if !output.status.success() {
-        // Fallback: try gt mol show
-        let output = Command::new("gt")
-            .args(["mol", "show", &molecule_id])
-            .output()
-            .map_err(|e| format!("Failed to get molecule: {}", e))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        // Parse molecule from gt mol show output
-        return parse_molecule_from_text(&molecule_id, &stdout);
+        return Err(format!("bd list failed: {}", String::from_utf8_lossy(&output.stderr)));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    serde_json::from_str(&stdout)
-        .map_err(|e| format!("Failed to parse molecule JSON: {}", e))
-}
+    let issues: Vec<BeadsIssue> = serde_json::from_str(&stdout)
+        .map_err(|e| format!("Failed to parse bd output: {}", e))?;
 
-/// Parse molecule from text output (fallback)
-fn parse_molecule_from_text(id: &str, text: &str) -> Result<Molecule, String> {
-    let mut steps: Vec<MoleculeStep> = Vec::new();
-    let mut name = id.to_string();
-    let mut description = None;
-    let mut status = "unknown".to_string();
+    let mut events: Vec<ActivityEvent> = Vec::new();
 
-    let lines: Vec<&str> = text.lines().collect();
-    let mut i = 0;
-
-    while i < lines.len() {
-        let line = lines[i].trim();
-
-        // Parse title/name
-        if line.starts_with(&format!("{}:", id)) || line.contains(": ") && i == 0 {
-            let parts: Vec<&str> = line.splitn(2, ": ").collect();
-            if parts.len() >= 2 {
-                name = parts[1].to_string();
-            }
-        }
-
-        // Parse status
-        if line.starts_with("Status:") {
-            status = line.replace("Status:", "").trim().to_string();
-        }
-
-        // Parse description
-        if line.starts_with("Description:") {
-            let mut desc_lines = Vec::new();
-            i += 1;
-            while i < lines.len() && !lines[i].trim().is_empty() && !lines[i].contains(":") {
-                desc_lines.push(lines[i].trim());
-                i += 1;
-            }
-            description = Some(desc_lines.join("\n"));
-            continue;
-        }
-
-        // Parse steps - look for step patterns
-        if line.contains("[") && (line.contains("pending") || line.contains("complete") ||
-            line.contains("active") || line.contains("failed")) {
-            // This looks like a step line
-            let step_status = if line.contains("complete") { StepStatus::Complete }
-                else if line.contains("active") { StepStatus::Active }
-                else if line.contains("failed") { StepStatus::Failed }
-                else if line.contains("blocked") { StepStatus::Blocked }
-                else { StepStatus::Pending };
-
-            // Extract step ID and title
-            let step_parts: Vec<&str> = line.split_whitespace().collect();
-            if !step_parts.is_empty() {
-                let step_id = step_parts[0].to_string();
-                let step_title = step_parts.iter().skip(3).map(|s| *s).collect::<Vec<_>>().join(" ");
-
-                steps.push(MoleculeStep {
-                    id: step_id,
-                    title: step_title,
-                    description: None,
-                    status: step_status,
-                    depends_on: vec![],
-                    assignee: None,
-                    started_at: None,
-                    completed_at: None,
+    for issue in issues {
+        // Add closed event if issue is closed
+        if issue.status == "closed" {
+            if let Some(closed_at) = &issue.closed_at {
+                events.push(ActivityEvent {
+                    timestamp: closed_at.clone(),
+                    event_type: "closed".to_string(),
+                    actor: issue.assignee.clone(),
+                    target_id: issue.id.clone(),
+                    target_title: issue.title.clone(),
+                    details: issue.close_reason.clone(),
                 });
             }
         }
 
-        i += 1;
+        // Add created event
+        events.push(ActivityEvent {
+            timestamp: issue.created_at.clone(),
+            event_type: "created".to_string(),
+            actor: issue.created_by.clone(),
+            target_id: issue.id.clone(),
+            target_title: issue.title.clone(),
+            details: None,
+        });
     }
 
-    Ok(Molecule {
-        id: id.to_string(),
-        name,
-        description,
-        status,
-        steps,
-        created_at: None,
-        updated_at: None,
-    })
-}
+    // Sort by timestamp descending (most recent first)
+    events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
-/// Get a demo molecule for testing visualization
-#[tauri::command]
-pub async fn get_demo_molecule() -> Result<Molecule, String> {
-    // Return a demo molecule for testing the visualizer
-    Ok(Molecule {
-        id: "demo-mol".to_string(),
-        name: "GastownUI Feature Development".to_string(),
-        description: Some("Demo molecule showing a typical feature workflow".to_string()),
-        status: "in_progress".to_string(),
-        steps: vec![
-            MoleculeStep {
-                id: "design".to_string(),
-                title: "Design Feature".to_string(),
-                description: Some("Create design document and mockups".to_string()),
-                status: StepStatus::Complete,
-                depends_on: vec![],
-                assignee: Some("designer".to_string()),
-                started_at: Some(1704600000),
-                completed_at: Some(1704686400),
-            },
-            MoleculeStep {
-                id: "implement".to_string(),
-                title: "Implement Feature".to_string(),
-                description: Some("Write the code implementation".to_string()),
-                status: StepStatus::Active,
-                depends_on: vec!["design".to_string()],
-                assignee: Some("polecat-toast".to_string()),
-                started_at: Some(1704686400),
-                completed_at: None,
-            },
-            MoleculeStep {
-                id: "test".to_string(),
-                title: "Write Tests".to_string(),
-                description: Some("Create unit and integration tests".to_string()),
-                status: StepStatus::Pending,
-                depends_on: vec!["implement".to_string()],
-                assignee: None,
-                started_at: None,
-                completed_at: None,
-            },
-            MoleculeStep {
-                id: "review".to_string(),
-                title: "Code Review".to_string(),
-                description: Some("Review code changes".to_string()),
-                status: StepStatus::Pending,
-                depends_on: vec!["implement".to_string(), "test".to_string()],
-                assignee: None,
-                started_at: None,
-                completed_at: None,
-            },
-            MoleculeStep {
-                id: "merge".to_string(),
-                title: "Merge to Main".to_string(),
-                description: Some("Submit to refinery merge queue".to_string()),
-                status: StepStatus::Pending,
-                depends_on: vec!["review".to_string()],
-                assignee: None,
-                started_at: None,
-                completed_at: None,
-            },
-        ],
-        created_at: Some(1704600000),
-        updated_at: Some(1704772800),
-    })
+    // Limit results
+    events.truncate(max_events);
+
+    Ok(events)
 }
