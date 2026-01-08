@@ -13,3 +13,41 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+/* Accessibility: Focus visible styles for keyboard navigation */
+/* These provide consistent focus indicators across all platforms */
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-orange-500;
+}
+
+/* Remove default focus outline, rely on focus-visible */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Ensure buttons and links have visible focus states */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  @apply ring-2 ring-orange-500 ring-offset-2 ring-offset-slate-900;
+}
+
+/* Input focus styles */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  @apply border-orange-500 ring-1 ring-orange-500;
+}
+
+/* Skip link screen reader only until focused */
+.sr-only:not(:focus):not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
