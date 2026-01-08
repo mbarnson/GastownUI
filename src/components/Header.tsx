@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Factory,
+  Glasses,
   Home,
   Menu,
   Network,
@@ -109,6 +110,19 @@ export default function Header() {
           >
             <Smartphone size={20} />
             <span className="font-medium">Mobile Companion</span>
+          </Link>
+
+          <Link
+            to="/visionos"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-violet-600 hover:bg-violet-700 transition-colors mb-2',
+            }}
+          >
+            <Glasses size={20} />
+            <span className="font-medium">VisionOS Spatial</span>
           </Link>
 
           {/* Demo Links Start */}
