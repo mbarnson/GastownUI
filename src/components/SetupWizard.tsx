@@ -1,351 +1,410 @@
-import { useState } from 'react'
-import {
-  Check,
-  X,
-  Download,
-  Folder,
-  Terminal,
-  Mic,
-  Loader2,
-  ExternalLink,
-  Flame,
-  ChevronRight,
-  Edit3,
-  FolderOpen,
-} from 'lucide-react'
+import { useState, useEffect } from 'react';
 import {
   useSetupStatus,
-  useInstallDependency,
-  useCreateWorkspace,
-  type DependencyInfo,
-} from '../hooks/useGastown'
+  useGoInstructions,
+  useBeadsInstructions,
+  getCurrentSetupScene,
+  SetupScene,
+} from '../hooks/useSetup';
+import { useSetupPreferences } from '../hooks/useSetupPreferences';
+import {
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Terminal,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 
 interface SetupWizardProps {
-  onComplete?: () => void
+  onComplete: () => void;
 }
 
 export function SetupWizard({ onComplete }: SetupWizardProps) {
-  const { data: status, isLoading, refetch } = useSetupStatus()
-  const installDep = useInstallDependency()
-  const createWorkspace = useCreateWorkspace()
-  const [voiceResponse, setVoiceResponse] = useState<string | null>(null)
-  const [activeInstall, setActiveInstall] = useState<string | null>(null)
-  const [workspacePath, setWorkspacePath] = useState<string>('~/gt')
-  const [showPathInput, setShowPathInput] = useState(false)
+  const { data: status, isLoading, refetch } = useSetupStatus();
+  const { preferences, isLoaded, disableVoice, enableVoice, setLastStep } = useSetupPreferences();
+  const scene = getCurrentSetupScene(status, isLoading);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
-        <span className="ml-3 text-gray-400">Checking your setup...</span>
-      </div>
-    )
-  }
-
-  if (!status) {
-    return (
-      <div className="text-center py-8 text-gray-400">
-        Unable to check setup status
-      </div>
-    )
-  }
-
-  // If everything is ready, show success
-  if (status.ready) {
-    return (
-      <div className="text-center py-12">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/20 mb-6">
-          <Check className="w-10 h-10 text-green-400" />
-        </div>
-        <h2 className="text-2xl font-bold text-white mb-4">
-          Welcome to Gas Town!
-        </h2>
-        <p className="text-gray-400 mb-6 max-w-md mx-auto">
-          All dependencies are installed and your workspace is ready.
-          Time to start slinging some work.
-        </p>
-        <button
-          onClick={onComplete}
-          className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors"
-        >
-          Enter Gas Town
-        </button>
-      </div>
-    )
-  }
-
-  const handleInstall = async (depName: string) => {
-    setActiveInstall(depName)
-    try {
-      const result = await installDep.mutateAsync(depName)
-      setVoiceResponse(result.voice_response)
-
-      // If it suggests opening a URL, do it
-      if (result.next_step?.startsWith('http')) {
-        window.open(result.next_step, '_blank')
-      }
-
-      // Refresh status after a short delay
-      setTimeout(() => refetch(), 1000)
-    } catch (error) {
-      setVoiceResponse(`Installation failed: ${error}`)
-    } finally {
-      setActiveInstall(null)
+  // Track current step for resume capability
+  useEffect(() => {
+    if (scene !== 'loading' && scene !== 'complete') {
+      setLastStep(scene);
     }
-  }
+  }, [scene, setLastStep]);
 
-  const handleCreateWorkspace = async () => {
-    setActiveInstall('workspace')
-    try {
-      // Expand ~ to home directory path (backend handles this)
-      const path = workspacePath.startsWith('~/')
-        ? workspacePath
-        : workspacePath || undefined
-      const result = await createWorkspace.mutateAsync(path)
-      setVoiceResponse(result.voice_response)
-      setShowPathInput(false)
-      setTimeout(() => refetch(), 1000)
-    } catch (error) {
-      setVoiceResponse(`Workspace creation failed: ${error}`)
-    } finally {
-      setActiveInstall(null)
+  // Auto-advance when setup is complete
+  useEffect(() => {
+    if (scene === 'complete') {
+      setLastStep(null);
+      const timer = setTimeout(onComplete, 1500);
+      return () => clearTimeout(timer);
     }
-  }
+  }, [scene, onComplete, setLastStep]);
 
-  const handlePathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setWorkspacePath(e.target.value)
-  }
+  const voiceEnabled = preferences.voiceEnabled;
 
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-500/20 mb-4">
-          <Flame className="w-8 h-8 text-orange-400" />
-        </div>
-        <h1 className="text-3xl font-bold text-white mb-2">
-          Gas Town Setup
-        </h1>
-        <p className="text-gray-400">
-          Let's get you ready to command the chaos
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-black text-white mb-2">
+            <span className="text-gray-400">GAS</span>{' '}
+            <span className="text-rose-500">TOWN</span>
+          </h1>
+          <p className="text-gray-400">First-Time Setup</p>
 
-      {/* Voice Guidance */}
-      {(voiceResponse || status.voice_guidance) && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-orange-500/20 rounded-lg">
-              <Mic className="w-5 h-5 text-orange-400" />
-            </div>
-            <div>
-              <div className="text-sm text-gray-500 mb-1">Voice Assistant</div>
-              <p className="text-gray-300">
-                {voiceResponse || status.voice_guidance}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Dependencies List */}
-      <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Terminal className="w-5 h-5" />
-            Dependencies
-            <span className="text-sm font-normal text-gray-500">
-              ({status.dependencies.filter((d) => d.installed).length}/{status.dependencies.length} installed)
-            </span>
-          </h2>
-        </div>
-        <div className="divide-y divide-slate-700">
-          {status.dependencies.map((dep) => (
-            <DependencyRow
-              key={dep.name}
-              dep={dep}
-              isInstalling={activeInstall === dep.name.toLowerCase()}
-              onInstall={() => handleInstall(dep.name.toLowerCase().split(' ')[0])}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Workspace Status */}
-      <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Folder className="w-5 h-5" />
-            Workspace
-          </h2>
-        </div>
-        <div className="p-4">
-          {status.workspace_exists ? (
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <Check className="w-5 h-5 text-green-400" />
-              </div>
-              <div>
-                <div className="text-white font-medium">Workspace Ready</div>
-                <div className="text-sm text-gray-400">
-                  {status.workspace_path}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-500/20 rounded-lg">
-                    <FolderOpen className="w-5 h-5 text-yellow-400" />
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">No Workspace</div>
-                    <div className="text-sm text-gray-400">
-                      Create a Gas Town workspace to get started
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowPathInput(!showPathInput)}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
-                  title="Change path"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Path Selection */}
-              {showPathInput && (
-                <div className="bg-slate-900/50 rounded-lg p-3 space-y-3">
-                  <label className="block text-sm text-gray-400">
-                    Workspace Location
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Folder className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                      <input
-                        type="text"
-                        value={workspacePath}
-                        onChange={handlePathChange}
-                        placeholder="~/gt"
-                        className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    This directory will be created if it doesn't exist. Use ~ for home directory.
-                  </p>
-                </div>
+          {/* Voice mode toggle */}
+          {isLoaded && scene !== 'complete' && (
+            <button
+              onClick={voiceEnabled ? disableVoice : enableVoice}
+              className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                voiceEnabled
+                  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                  : 'bg-slate-700 text-gray-400 hover:bg-slate-600'
+              }`}
+              title={voiceEnabled ? 'Voice guidance enabled' : 'Text-only mode'}
+            >
+              {voiceEnabled ? (
+                <>
+                  <Volume2 className="w-3.5 h-3.5" />
+                  Voice Enabled
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-3.5 h-3.5" />
+                  Text Only
+                </>
               )}
-
-              {/* Create Button */}
-              <div className="flex justify-end">
-                <button
-                  onClick={handleCreateWorkspace}
-                  disabled={status.missing_count > 0 || activeInstall !== null}
-                  className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-                >
-                  {activeInstall === 'workspace' ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                  Create at {workspacePath}
-                </button>
-              </div>
-
-              {/* Missing Dependencies Warning */}
-              {status.missing_count > 0 && (
-                <p className="text-sm text-yellow-400">
-                  Install all dependencies before creating workspace
-                </p>
-              )}
-            </div>
+            </button>
           )}
         </div>
-      </div>
 
-      {/* Refresh Button */}
-      <div className="text-center mt-6">
-        <button
-          onClick={() => {
-            setVoiceResponse(null)
-            refetch()
-          }}
-          className="text-gray-400 hover:text-white transition-colors"
-        >
-          Refresh Status
-        </button>
+        {/* Progress indicator */}
+        <div className="flex items-center justify-center gap-4 mb-8">
+          <StepIndicator
+            step={1}
+            label="Go"
+            status={getStepStatus('go-install', scene, status?.go.installed)}
+          />
+          <div className="w-12 h-0.5 bg-slate-700" />
+          <StepIndicator
+            step={2}
+            label="Beads"
+            status={getStepStatus('beads-install', scene, status?.beads.installed)}
+          />
+        </div>
+
+        {/* Scene content */}
+        <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+          {scene === 'loading' && <LoadingScene />}
+          {scene === 'go-install' && <GoInstallScene onRefresh={refetch} voiceEnabled={voiceEnabled} />}
+          {scene === 'beads-install' && <BeadsInstallScene onRefresh={refetch} voiceEnabled={voiceEnabled} />}
+          {scene === 'complete' && <CompleteScene />}
+        </div>
       </div>
     </div>
-  )
+  );
 }
 
-interface DependencyRowProps {
-  dep: DependencyInfo
-  isInstalling: boolean
-  onInstall: () => void
+function getStepStatus(
+  targetScene: SetupScene,
+  currentScene: SetupScene,
+  isInstalled?: boolean
+): 'pending' | 'active' | 'complete' {
+  if (isInstalled) return 'complete';
+  if (currentScene === targetScene) return 'active';
+  return 'pending';
 }
 
-function DependencyRow({ dep, isInstalling, onInstall }: DependencyRowProps) {
+interface StepIndicatorProps {
+  step: number;
+  label: string;
+  status: 'pending' | 'active' | 'complete';
+}
+
+function StepIndicator({ step, label, status }: StepIndicatorProps) {
   return (
-    <div className="px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div
-          className={`p-2 rounded-lg ${
-            dep.installed ? 'bg-green-500/20' : 'bg-red-500/20'
-          }`}
-        >
-          {dep.installed ? (
-            <Check className="w-4 h-4 text-green-400" />
-          ) : (
-            <X className="w-4 h-4 text-red-400" />
-          )}
+    <div className="flex items-center gap-2">
+      <div
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+          status === 'complete'
+            ? 'bg-emerald-500 text-white'
+            : status === 'active'
+            ? 'bg-rose-500 text-white'
+            : 'bg-slate-700 text-gray-400'
+        }`}
+      >
+        {status === 'complete' ? <CheckCircle className="w-5 h-5" /> : step}
+      </div>
+      <span
+        className={`text-sm ${
+          status === 'active' ? 'text-white font-medium' : 'text-gray-400'
+        }`}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function LoadingScene() {
+  return (
+    <div className="text-center py-8">
+      <Loader2 className="w-12 h-12 text-rose-500 animate-spin mx-auto mb-4" />
+      <p className="text-gray-400">Checking system requirements...</p>
+    </div>
+  );
+}
+
+function GoInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void; voiceEnabled: boolean }) {
+  const { data: instructions, isLoading } = useGoInstructions();
+  const { data: status } = useSetupStatus();
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Extract the main command from instructions
+  const mainCommand = instructions?.split('\n')[0] || '';
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start gap-4">
+        <div className="p-3 bg-amber-500/20 rounded-lg">
+          <XCircle className="w-6 h-6 text-amber-400" />
         </div>
         <div>
-          <div className="text-white font-medium">{dep.name}</div>
-          {dep.installed ? (
-            <div className="text-sm text-gray-500">
-              {dep.version || 'Installed'} {dep.path && `• ${dep.path}`}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-500">
-              {dep.install_instructions}
-            </div>
-          )}
+          <h2 className="text-xl font-semibold text-white mb-1">Go Required</h2>
+          <p className="text-gray-400">
+            Gas Town needs Go to run the Beads issue tracker.
+          </p>
         </div>
       </div>
 
-      {!dep.installed && (
-        <div className="flex items-center gap-2">
-          {dep.install_url && (
-            <a
-              href={dep.install_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 text-gray-400 hover:text-white transition-colors"
-              title="Open download page"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          )}
-          <button
-            onClick={onInstall}
-            disabled={isInstalling}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {isInstalling ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            Install
-          </button>
+      {/* Non-voice mode: Expanded step-by-step instructions */}
+      {!voiceEnabled && (
+        <div className="p-4 bg-slate-900/70 rounded-lg border border-slate-600 space-y-3">
+          <h3 className="text-sm font-medium text-white flex items-center gap-2">
+            <VolumeX className="w-4 h-4 text-gray-400" />
+            Step-by-Step Instructions
+          </h3>
+          <ol className="text-sm text-gray-300 space-y-2 list-decimal list-inside">
+            <li>Open your terminal application</li>
+            <li>Copy the installation command below</li>
+            <li>Paste and run the command in your terminal</li>
+            <li>Wait for the installation to complete</li>
+            <li>Click "Check Again" when done</li>
+          </ol>
         </div>
       )}
+
+      {/* Platform info */}
+      {status?.platform && (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <Terminal className="w-4 h-4" />
+          <span>
+            Detected: {status.platform.os} ({status.platform.arch})
+            {status.platform.package_manager && (
+              <> with {status.platform.package_manager}</>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* Installation instructions */}
+      <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-gray-400">Installation command:</span>
+          <button
+            onClick={() => copyToClipboard(mainCommand)}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+          >
+            <Copy className="w-3 h-3" />
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <code className="block text-emerald-400 font-mono text-sm whitespace-pre-wrap">
+          {isLoading ? 'Loading...' : mainCommand}
+        </code>
+      </div>
+
+      {/* Full instructions */}
+      {instructions && instructions.includes('\n') && (
+        <details className="group">
+          <summary className="text-sm text-gray-400 cursor-pointer hover:text-white transition-colors">
+            Show full instructions
+          </summary>
+          <pre className="mt-2 p-3 bg-slate-900/50 rounded-lg text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto">
+            {instructions}
+          </pre>
+        </details>
+      )}
+
+      {/* Error message if any */}
+      {status?.go.error && (
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p className="text-sm text-red-400">{status.go.error}</p>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between">
+        <a
+          href="https://go.dev/dl/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Download from go.dev
+        </a>
+        <button
+          onClick={onRefresh}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Check Again
+        </button>
+      </div>
     </div>
-  )
+  );
 }
 
-export default SetupWizard
+function BeadsInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void; voiceEnabled: boolean }) {
+  const { data: instructions, isLoading } = useBeadsInstructions();
+  const { data: status } = useSetupStatus();
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const mainCommand = 'go install github.com/steveyegge/beads/cmd/bd@latest';
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start gap-4">
+        <div className="p-3 bg-emerald-500/20 rounded-lg">
+          <CheckCircle className="w-6 h-6 text-emerald-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-white mb-1">Go Installed!</h2>
+          <p className="text-gray-400">
+            Now let's install Beads for issue tracking.
+          </p>
+        </div>
+      </div>
+
+      {/* Go version */}
+      {status?.go.version && (
+        <div className="flex items-center gap-2 text-sm text-emerald-400">
+          <CheckCircle className="w-4 h-4" />
+          <span>Go {status.go.version} detected at {status.go.path}</span>
+        </div>
+      )}
+
+      {/* Non-voice mode: Expanded step-by-step instructions */}
+      {!voiceEnabled && (
+        <div className="p-4 bg-slate-900/70 rounded-lg border border-slate-600 space-y-3">
+          <h3 className="text-sm font-medium text-white flex items-center gap-2">
+            <VolumeX className="w-4 h-4 text-gray-400" />
+            Step-by-Step Instructions
+          </h3>
+          <ol className="text-sm text-gray-300 space-y-2 list-decimal list-inside">
+            <li>Open your terminal application</li>
+            <li>Copy the go install command below</li>
+            <li>Paste and run the command in your terminal</li>
+            <li>Ensure <code className="bg-slate-800 px-1 rounded">$(go env GOPATH)/bin</code> is in your PATH</li>
+            <li>Click "Check Again" when done</li>
+          </ol>
+        </div>
+      )}
+
+      {/* Installation instructions */}
+      <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-gray-400">Installation command:</span>
+          <button
+            onClick={() => copyToClipboard(mainCommand)}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+          >
+            <Copy className="w-3 h-3" />
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <code className="block text-emerald-400 font-mono text-sm">
+          {isLoading ? 'Loading...' : mainCommand}
+        </code>
+      </div>
+
+      {/* PATH reminder */}
+      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+        <p className="text-sm text-amber-400">
+          <strong>PATH Note:</strong> Make sure <code className="bg-slate-800 px-1 rounded">$(go env GOPATH)/bin</code> is in your PATH.
+        </p>
+      </div>
+
+      {/* Full instructions */}
+      {instructions && instructions.includes('\n') && (
+        <details className="group">
+          <summary className="text-sm text-gray-400 cursor-pointer hover:text-white transition-colors">
+            Show full instructions
+          </summary>
+          <pre className="mt-2 p-3 bg-slate-900/50 rounded-lg text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto">
+            {instructions}
+          </pre>
+        </details>
+      )}
+
+      {/* Error message if any */}
+      {status?.beads.error && (
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p className="text-sm text-red-400">{status.beads.error}</p>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between">
+        <a
+          href="https://github.com/steveyegge/beads"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Beads on GitHub
+        </a>
+        <button
+          onClick={onRefresh}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Check Again
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CompleteScene() {
+  return (
+    <div className="text-center py-8">
+      <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <CheckCircle className="w-10 h-10 text-emerald-400" />
+      </div>
+      <h2 className="text-xl font-semibold text-white mb-2">Setup Complete!</h2>
+      <p className="text-gray-400">All dependencies installed. Starting Gas Town...</p>
+    </div>
+  );
+}
+
+export default SetupWizard;

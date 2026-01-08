@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
 import { SelfTestPanel } from '../components/SelfTestPanel'
 import { TmuxPanel } from '../components/TmuxPanel'
@@ -7,6 +7,7 @@ import { DeepQueryPanel } from '../components/DeepQueryPanel'
 import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
+import { useSetupStatus, isSetupComplete } from '../hooks/useSetup'
 import {
   Truck,
   Terminal,
@@ -23,11 +24,20 @@ export const Route = createFileRoute('/')({ component: Dashboard })
 type SidebarMode = 'voice' | 'selfTest' | 'deepQuery'
 
 function Dashboard() {
+  const navigate = useNavigate()
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('voice')
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
   const { data: molecules } = useActiveMolecules()
+  const { data: setupStatus, isLoading: setupLoading } = useSetupStatus()
+
+  // Redirect to setup if dependencies are missing
+  useEffect(() => {
+    if (!setupLoading && setupStatus && !isSetupComplete(setupStatus)) {
+      navigate({ to: '/setup' })
+    }
+  }, [setupStatus, setupLoading, navigate])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">

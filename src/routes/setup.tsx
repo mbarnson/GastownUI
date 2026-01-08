@@ -8,13 +8,9 @@ export const Route = createFileRoute('/setup')({
 function SetupPage() {
   const navigate = useNavigate()
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 py-12 px-6">
-      <SetupWizard
-        onComplete={() => {
-          navigate({ to: '/' })
-        }}
-      />
-    </div>
-  )
+  const handleComplete = () => {
+    navigate({ to: '/' })
+  }
+
+  return <SetupWizard onComplete={handleComplete} />
 }

@@ -2,6 +2,7 @@ mod gastown;
 mod voice;
 mod self_test;
 mod instruct;
+mod setup;
 
 use voice::VoiceServerState;
 use self_test::SelfTestState;
@@ -47,6 +48,12 @@ pub fn run() {
             instruct::get_instruct_status,
             instruct::set_instruct_model,
             instruct::query_deep,
+            setup::check_go_installation,
+            setup::check_beads_installation,
+            setup::get_platform_info,
+            setup::get_setup_status,
+            setup::get_go_install_instructions,
+            setup::get_beads_install_instructions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
