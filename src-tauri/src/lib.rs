@@ -1,8 +1,8 @@
+mod events;
 mod gastown;
-mod vision;
 mod voice;
 
-use vision::VisionServerState;
+use events::EventsWatcherState;
 use voice::VoiceServerState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -12,7 +12,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .manage(VoiceServerState::default())
-        .manage(VisionServerState::default())
+        .manage(EventsWatcherState::default())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -31,21 +31,18 @@ pub fn run() {
             gastown::capture_tmux_pane,
             gastown::get_session_details,
             gastown::attach_tmux_session,
-            gastown::list_molecules,
-            gastown::get_molecule_details,
-            gastown::get_demo_molecule,
             voice::start_voice_server,
             voice::stop_voice_server,
             voice::get_voice_server_status,
             voice::send_voice_input,
             voice::send_text_to_speech,
             voice::transcribe_audio,
-            vision::capture_screenshot,
-            vision::start_vision_server,
-            vision::stop_vision_server,
-            vision::get_vision_server_status,
-            vision::describe_screen,
-            vision::describe_image,
+            events::start_events_watcher,
+            events::stop_events_watcher,
+            events::set_events_verbosity,
+            events::get_events_verbosity,
+            events::get_recent_events,
+            events::is_events_watcher_active,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
