@@ -200,18 +200,61 @@ export function useConvoys() {
         return mockConvoys
       }
 
-      const result = await runCommand('gt', ['convoy', 'list'])
+      const result = await runCommand('gt', ['convoy', 'list', '--json'])
       if (result.exit_code !== 0) {
         console.warn('gt convoy list failed:', result.stderr)
         return []
       }
 
-      // TODO: Implement actual parsing when we know the format
-      return []
+      return parseConvoyJson(result.stdout)
     },
     refetchInterval: 2000,
     staleTime: 1000,
   })
+}
+
+/**
+ * Parse convoy list JSON output from `gt convoy list --json`
+ */
+function parseConvoyJson(output: string): Convoy[] {
+  if (!output.trim()) {
+    return []
+  }
+
+  try {
+    const data = JSON.parse(output)
+
+    // Handle both array and object with convoys key
+    const convoys = Array.isArray(data) ? data : data.convoys || []
+
+    return convoys.map((c: Record<string, unknown>) => ({
+      id: String(c.id || ''),
+      name: String(c.name || ''),
+      beads: Array.isArray(c.beads) ? c.beads.map(String) : [],
+      progress: typeof c.progress === 'number' ? c.progress : 0,
+      active_polecats: typeof c.active_polecats === 'number' ? c.active_polecats : 0,
+      status: normalizeConvoyStatus(c.status),
+      created: String(c.created || ''),
+      eta: c.eta ? String(c.eta) : undefined,
+      // Support additional fields from gt output
+      polecats: Array.isArray(c.polecats) ? c.polecats.map(String) : undefined,
+    })) as Convoy[]
+  } catch (e) {
+    console.warn('Failed to parse convoy JSON:', e)
+    return []
+  }
+}
+
+/**
+ * Normalize convoy status to expected enum values
+ */
+function normalizeConvoyStatus(status: unknown): Convoy['status'] {
+  const s = String(status).toLowerCase()
+  if (s === 'running' || s === 'active' || s === 'in_progress') return 'running'
+  if (s === 'completed' || s === 'done' || s === 'finished') return 'completed'
+  if (s === 'paused' || s === 'stopped') return 'paused'
+  if (s === 'failed' || s === 'error') return 'failed'
+  return 'running' // Default to running for unknown statuses
 }
 
 // Fetch all rigs in the town

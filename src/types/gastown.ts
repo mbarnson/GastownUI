@@ -38,6 +38,7 @@ export interface Convoy {
   status: 'running' | 'completed' | 'paused' | 'failed'
   created: string
   eta?: string
+  polecats?: string[] // Names of polecats working on this convoy
 }
 
 export interface Rig {
@@ -103,9 +104,37 @@ export function parseBeadList(output: string): Bead[] {
 }
 
 export function parseConvoyList(output: string): Convoy[] {
-  // Convoy list parsing - format TBD based on actual gt convoy list output
-  // For now return empty array until we can test real output
-  return []
+  if (!output.trim()) {
+    return []
+  }
+
+  try {
+    const data = JSON.parse(output)
+    const convoys = Array.isArray(data) ? data : data.convoys || []
+
+    return convoys.map((c: Record<string, unknown>) => ({
+      id: String(c.id || ''),
+      name: String(c.name || ''),
+      beads: Array.isArray(c.beads) ? c.beads.map(String) : [],
+      progress: typeof c.progress === 'number' ? c.progress : 0,
+      active_polecats: typeof c.active_polecats === 'number' ? c.active_polecats : 0,
+      status: normalizeConvoyStatus(c.status),
+      created: String(c.created || ''),
+      eta: c.eta ? String(c.eta) : undefined,
+      polecats: Array.isArray(c.polecats) ? c.polecats.map(String) : undefined,
+    }))
+  } catch {
+    return []
+  }
+}
+
+function normalizeConvoyStatus(status: unknown): Convoy['status'] {
+  const s = String(status).toLowerCase()
+  if (s === 'running' || s === 'active' || s === 'in_progress') return 'running'
+  if (s === 'completed' || s === 'done' || s === 'finished') return 'completed'
+  if (s === 'paused' || s === 'stopped') return 'paused'
+  if (s === 'failed' || s === 'error') return 'failed'
+  return 'running'
 }
 
 export function parseTownStatus(statusOutput: string, rigsOutput: string): TownStatus {
