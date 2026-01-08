@@ -1,113 +1,96 @@
-// Types for visual formula/molecule editor
+// Types for Design Mode - Visual formula/molecule editor
 
-export interface Position {
-  x: number
-  y: number
-}
+import type { StepStatus } from './molecule'
 
-export interface Step {
-  id: string
-  title: string
-  description: string
-  position: Position
-  variables: Record<string, VariableBinding>
-  status?: 'pending' | 'active' | 'complete' | 'failed'
-}
-
-export interface Wire {
-  id: string
-  from: string // Step ID
-  to: string // Step ID
-}
-
-export interface VariableBinding {
-  name: string
-  description: string
-  value?: string
-  required: boolean
-  type: 'string' | 'number' | 'boolean' | 'array'
-}
-
-export interface Variable {
+/** Variable definition for a formula template */
+export interface FormulaVariable {
   name: string
   description: string
   required: boolean
-  type: 'string' | 'number' | 'boolean' | 'array'
   default?: string
 }
 
-export interface Formula {
+/** Step definition for design mode (editable, not runtime) */
+export interface FormulaStep {
   id: string
-  name: string
+  title: string
   description: string
-  version: number
-  steps: Step[]
-  wires: Wire[]
-  variables: Variable[]
+  depends_on: string[]  // IDs of steps this depends on
 }
 
-// Default empty formula
+/** Complete formula definition */
+export interface Formula {
+  name: string
+  description: string
+  type: 'workflow' | 'blueprint'
+  version: number
+  steps: FormulaStep[]
+  variables: FormulaVariable[]
+}
+
+/** Design state for a step being edited */
+export interface DesignStep extends FormulaStep {
+  // Position in the canvas (managed by React Flow but tracked for persistence)
+  position: { x: number; y: number }
+  // UI state
+  isEditing: boolean
+  isSelected: boolean
+}
+
+/** Design mode state */
+export interface DesignState {
+  formula: Formula
+  steps: DesignStep[]
+  selectedStepId: string | null
+  isDirty: boolean
+}
+
+/** Empty formula template */
 export function createEmptyFormula(name: string = 'New Formula'): Formula {
   return {
-    id: `formula-${Date.now()}`,
     name,
     description: '',
+    type: 'workflow',
     version: 1,
     steps: [],
-    wires: [],
     variables: [],
   }
 }
 
-// Create a new step at position
-export function createStep(
-  title: string,
-  position: Position,
-  description: string = ''
-): Step {
+/** Create a new step with default values */
+export function createNewStep(id: string): FormulaStep {
   return {
-    id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    title,
-    description,
-    position,
-    variables: {},
-    status: 'pending',
+    id,
+    title: 'New Step',
+    description: '',
+    depends_on: [],
   }
 }
 
-// Create a wire between steps
-export function createWire(fromId: string, toId: string): Wire {
-  return {
-    id: `wire-${fromId}-${toId}`,
-    from: fromId,
-    to: toId,
-  }
+/** Generate unique step ID */
+export function generateStepId(): string {
+  return `step-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 4)}`
 }
 
-// Export formula to TOML format
+/** Convert formula to TOML format for Gas Town */
 export function formulaToToml(formula: Formula): string {
   const lines: string[] = []
 
   // Header
-  lines.push(`description = "${escapeToml(formula.description)}"`)
-  lines.push(`formula = "${escapeToml(formula.name)}"`)
-  lines.push(`type = "workflow"`)
+  lines.push(`description = "${escapeTomlString(formula.description)}"`)
+  lines.push(`formula = "${escapeTomlString(formula.name)}"`)
+  lines.push(`type = "${formula.type}"`)
   lines.push(`version = ${formula.version}`)
   lines.push('')
 
   // Steps
   for (const step of formula.steps) {
     lines.push('[[steps]]')
-    lines.push(`id = "${step.id}"`)
-    lines.push(`title = "${escapeToml(step.title)}"`)
+    lines.push(`id = "${escapeTomlString(step.id)}"`)
+    lines.push(`title = "${escapeTomlString(step.title)}"`)
 
-    // Find dependencies (wires pointing to this step)
-    const needs = formula.wires
-      .filter((w) => w.to === step.id)
-      .map((w) => `"${w.from}"`)
-
-    if (needs.length > 0) {
-      lines.push(`needs = [${needs.join(', ')}]`)
+    if (step.depends_on.length > 0) {
+      lines.push(`needs = [${step.depends_on.map(d => `"${escapeTomlString(d)}"`).join(', ')}]`)
     }
 
     lines.push(`description = """`)
@@ -119,10 +102,10 @@ export function formulaToToml(formula: Formula): string {
   // Variables
   for (const variable of formula.variables) {
     lines.push(`[vars.${variable.name}]`)
-    lines.push(`description = "${escapeToml(variable.description)}"`)
+    lines.push(`description = "${escapeTomlString(variable.description)}"`)
     lines.push(`required = ${variable.required}`)
-    if (variable.default) {
-      lines.push(`default = "${escapeToml(variable.default)}"`)
+    if (variable.default !== undefined) {
+      lines.push(`default = "${escapeTomlString(variable.default)}"`)
     }
     lines.push('')
   }
@@ -130,114 +113,104 @@ export function formulaToToml(formula: Formula): string {
   return lines.join('\n')
 }
 
-// Helper to escape TOML strings
-function escapeToml(str: string): string {
+/** Escape special characters for TOML strings */
+function escapeTomlString(str: string): string {
   return str
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
 }
 
-// Parse step dependencies into a DAG order
-export function topologicalSort(formula: Formula): Step[] {
-  const visited = new Set<string>()
-  const result: Step[] = []
-  const stepMap = new Map(formula.steps.map((s) => [s.id, s]))
-
-  // Build adjacency list (dependencies)
-  const deps = new Map<string, string[]>()
-  for (const step of formula.steps) {
-    deps.set(step.id, [])
-  }
-  for (const wire of formula.wires) {
-    const existing = deps.get(wire.to) || []
-    existing.push(wire.from)
-    deps.set(wire.to, existing)
-  }
-
-  function visit(id: string) {
-    if (visited.has(id)) return
-    visited.add(id)
-
-    // Visit dependencies first
-    for (const depId of deps.get(id) || []) {
-      visit(depId)
-    }
-
-    const step = stepMap.get(id)
-    if (step) result.push(step)
-  }
-
-  for (const step of formula.steps) {
-    visit(step.id)
-  }
-
-  return result
+/** Parse variable references in text (e.g., {{feature}}) */
+export function extractVariableRefs(text: string): string[] {
+  const matches = text.match(/\{\{(\w+)\}\}/g)
+  if (!matches) return []
+  return [...new Set(matches.map(m => m.slice(2, -2)))]
 }
 
-// Validate formula for cycles
-export function validateFormula(formula: Formula): { valid: boolean; errors: string[] } {
-  const errors: string[] = []
-
-  // Check for cycles using DFS
-  const visited = new Set<string>()
-  const inStack = new Set<string>()
-
-  // Build adjacency list
-  const adj = new Map<string, string[]>()
-  for (const step of formula.steps) {
-    adj.set(step.id, [])
-  }
-  for (const wire of formula.wires) {
-    const existing = adj.get(wire.from) || []
-    existing.push(wire.to)
-    adj.set(wire.from, existing)
-  }
-
-  function hasCycle(id: string): boolean {
-    if (inStack.has(id)) return true
-    if (visited.has(id)) return false
-
-    visited.add(id)
-    inStack.add(id)
-
-    for (const neighbor of adj.get(id) || []) {
-      if (hasCycle(neighbor)) return true
-    }
-
-    inStack.delete(id)
-    return false
-  }
+/** Get all variable references used in a formula */
+export function getUsedVariables(formula: Formula): string[] {
+  const used = new Set<string>()
 
   for (const step of formula.steps) {
-    if (hasCycle(step.id)) {
-      errors.push(`Cycle detected involving step "${step.title}"`)
-      break
-    }
+    extractVariableRefs(step.title).forEach(v => used.add(v))
+    extractVariableRefs(step.description).forEach(v => used.add(v))
   }
 
-  // Check for orphan wires
-  const stepIds = new Set(formula.steps.map((s) => s.id))
-  for (const wire of formula.wires) {
-    if (!stepIds.has(wire.from)) {
-      errors.push(`Wire references non-existent step: ${wire.from}`)
-    }
-    if (!stepIds.has(wire.to)) {
-      errors.push(`Wire references non-existent step: ${wire.to}`)
-    }
+  return [...used]
+}
+
+/** Validate formula for completeness */
+export interface ValidationError {
+  type: 'error' | 'warning'
+  message: string
+  stepId?: string
+  field?: string
+}
+
+export function validateFormula(formula: Formula): ValidationError[] {
+  const errors: ValidationError[] = []
+
+  // Name required
+  if (!formula.name.trim()) {
+    errors.push({ type: 'error', message: 'Formula name is required', field: 'name' })
   }
 
-  // Check for duplicate step IDs
-  const seenIds = new Set<string>()
+  // At least one step
+  if (formula.steps.length === 0) {
+    errors.push({ type: 'error', message: 'Formula must have at least one step' })
+  }
+
+  // Check each step
+  const stepIds = new Set(formula.steps.map(s => s.id))
   for (const step of formula.steps) {
-    if (seenIds.has(step.id)) {
-      errors.push(`Duplicate step ID: ${step.id}`)
+    if (!step.title.trim()) {
+      errors.push({
+        type: 'error',
+        message: `Step "${step.id}" must have a title`,
+        stepId: step.id,
+        field: 'title'
+      })
     }
-    seenIds.add(step.id)
+
+    // Check dependencies exist
+    for (const dep of step.depends_on) {
+      if (!stepIds.has(dep)) {
+        errors.push({
+          type: 'error',
+          message: `Step "${step.id}" depends on unknown step "${dep}"`,
+          stepId: step.id,
+          field: 'depends_on'
+        })
+      }
+    }
   }
 
-  return {
-    valid: errors.length === 0,
-    errors,
+  // Check for cycles (simplified - just check self-reference)
+  for (const step of formula.steps) {
+    if (step.depends_on.includes(step.id)) {
+      errors.push({
+        type: 'error',
+        message: `Step "${step.id}" cannot depend on itself`,
+        stepId: step.id
+      })
+    }
   }
+
+  // Check variables are defined
+  const definedVars = new Set(formula.variables.map(v => v.name))
+  const usedVars = getUsedVariables(formula)
+  for (const usedVar of usedVars) {
+    if (!definedVars.has(usedVar)) {
+      errors.push({
+        type: 'warning',
+        message: `Variable "{{${usedVar}}}" is used but not defined`,
+        field: 'variables'
+      })
+    }
+  }
+
+  return errors
 }
