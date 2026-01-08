@@ -437,6 +437,205 @@ export function useUpdateBead() {
   })
 }
 
+export interface DependencyInfo {
+  name: string
+  installed: boolean
+  version?: string
+  path?: string
+  install_instructions?: string
+  install_url?: string
+}
+
+export interface SetupStatus {
+  ready: boolean
+  missing_count: number
+  workspace_exists: boolean
+  workspace_path?: string
+  voice_guidance?: string
+  dependencies: DependencyInfo[]
+}
+
+interface InstallResult {
+  voice_response: string
+  next_step?: string
+}
+
+const setupDependencies = [
+  {
+    key: 'go',
+    name: 'Go',
+    versionArgs: ['version'],
+    versionRegex: /go(\d+\.\d+(?:\.\d+)?)/,
+    install_instructions: 'Install Go from https://go.dev/dl/ or run: brew install go',
+    install_url: 'https://go.dev/dl/',
+  },
+  {
+    key: 'beads',
+    name: 'Beads',
+    versionArgs: ['version'],
+    versionRegex: /(\d+\.\d+\.\d+)/,
+    install_instructions: 'Run: go install github.com/steveyegge/beads/cmd/bd@latest',
+    install_url: 'https://github.com/steveyegge/beads',
+  },
+  {
+    key: 'gastown',
+    name: 'Gastown',
+    versionArgs: ['version'],
+    versionRegex: /(\d+\.\d+\.\d+)/,
+    install_instructions: 'Run: go install github.com/txgsync/gastown/cmd/gt@latest',
+    install_url: 'https://github.com/txgsync/gastown',
+  },
+  {
+    key: 'tmux',
+    name: 'tmux',
+    versionArgs: ['-V'],
+    versionRegex: /tmux\s+([\d.]+)/,
+    install_instructions: 'Install tmux: brew install tmux (macOS) or apt install tmux (Linux)',
+    install_url: 'https://github.com/tmux/tmux',
+  },
+] as const
+
+async function checkDependency(
+  cmd: string,
+  args: string[],
+  versionRegex?: RegExp
+): Promise<{ installed: boolean; version?: string }> {
+  try {
+    const result = await runCommand(cmd, args)
+    if (result.exit_code !== 0) {
+      return { installed: false }
+    }
+    const version = versionRegex ? result.stdout.match(versionRegex)?.[1] : undefined
+    return { installed: true, version }
+  } catch {
+    return { installed: false }
+  }
+}
+
+function buildVoiceGuidance(
+  missing: DependencyInfo[],
+  workspaceExists: boolean
+): string | undefined {
+  if (missing.length > 0) {
+    return `Install ${missing[0].name} to continue.`
+  }
+  if (!workspaceExists) {
+    return 'Create a workspace to finish setup.'
+  }
+  return 'All set. Welcome to Gas Town.'
+}
+
+export function useSetupStatus() {
+  return useQuery({
+    queryKey: ['setupStatus'],
+    queryFn: async (): Promise<SetupStatus> => {
+      if (!isTauri()) {
+        const dependencies = setupDependencies.map((dep) => ({
+          name: dep.name,
+          installed: true,
+          version: 'dev',
+        }))
+        return {
+          ready: true,
+          missing_count: 0,
+          workspace_exists: true,
+          workspace_path: '~/gt',
+          voice_guidance: 'All set. Welcome to Gas Town.',
+          dependencies,
+        }
+      }
+
+      const dependencies: DependencyInfo[] = []
+      for (const dep of setupDependencies) {
+        const { installed, version } = await checkDependency(
+          dep.key === 'beads' ? 'bd' : dep.key === 'gastown' ? 'gt' : dep.key,
+          dep.versionArgs,
+          dep.versionRegex
+        )
+        dependencies.push({
+          name: dep.name,
+          installed,
+          version,
+          install_instructions: dep.install_instructions,
+          install_url: dep.install_url,
+        })
+      }
+
+      let workspace_exists = false
+      let workspace_path: string | undefined
+      try {
+        const statusResult = await runCommand('gt', ['status'])
+        workspace_exists = statusResult.exit_code === 0
+      } catch {
+        workspace_exists = false
+      }
+
+      const missing = dependencies.filter((dep) => !dep.installed)
+      const ready = missing.length === 0 && workspace_exists
+
+      return {
+        ready,
+        missing_count: missing.length,
+        workspace_exists,
+        workspace_path,
+        voice_guidance: buildVoiceGuidance(missing, workspace_exists),
+        dependencies,
+      }
+    },
+    refetchInterval: 5000,
+    staleTime: 2000,
+    enabled: isBrowser,
+  })
+}
+
+export function useInstallDependency() {
+  return useMutation({
+    mutationFn: async (dependency: string): Promise<InstallResult> => {
+      const key = dependency.toLowerCase()
+      if (key === 'go') {
+        return {
+          voice_response: 'Install Go from https://go.dev/dl/ or run: brew install go',
+          next_step: 'https://go.dev/dl/',
+        }
+      }
+      if (key === 'beads' || key === 'bd') {
+        return {
+          voice_response: 'Run: go install github.com/steveyegge/beads/cmd/bd@latest',
+          next_step: 'https://github.com/steveyegge/beads',
+        }
+      }
+      if (key === 'gastown' || key === 'gt') {
+        return {
+          voice_response: 'Run: go install github.com/txgsync/gastown/cmd/gt@latest',
+          next_step: 'https://github.com/txgsync/gastown',
+        }
+      }
+      if (key === 'tmux') {
+        return {
+          voice_response: 'Install tmux: brew install tmux (macOS) or apt install tmux (Linux)',
+          next_step: 'https://github.com/tmux/tmux',
+        }
+      }
+      return {
+        voice_response: `No installer available for ${dependency}.`,
+      }
+    },
+  })
+}
+
+export function useCreateWorkspace() {
+  return useMutation({
+    mutationFn: async (path?: string): Promise<InstallResult> => {
+      if (!path) {
+        return { voice_response: 'Provide a workspace path to continue.' }
+      }
+      return {
+        voice_response: `Create a workspace at ${path} and run: gt init ${path}`,
+      }
+    },
+  })
+}
+
 // Setup state for FTUE banner
 export interface SetupState {
   hasGo: boolean

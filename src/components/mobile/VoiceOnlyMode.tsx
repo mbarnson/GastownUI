@@ -30,10 +30,15 @@ export default function VoiceOnlyMode({ onCommand }: VoiceOnlyModeProps) {
   const [showTranscript, setShowTranscript] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) {
+      return
+    }
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
   const toggleListening = () => {
@@ -241,7 +246,10 @@ export default function VoiceOnlyMode({ onCommand }: VoiceOnlyModeProps) {
           )}
         </button>
 
-        <div className="overflow-y-auto h-[calc(100%-48px)] px-4 pb-4">
+        <div
+          className="overflow-y-auto h-[calc(100%-48px)] px-4 pb-4"
+          ref={messagesContainerRef}
+        >
           {messages.map((message) => (
             <div
               key={message.id}

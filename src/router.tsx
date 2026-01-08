@@ -9,7 +9,7 @@ export const getRouter = () => {
     routeTree,
     context: {},
 
-    scrollRestoration: true,
+    scrollRestoration: false,
     defaultPreloadStaleTime: 0,
   })
 

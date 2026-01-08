@@ -2,12 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import {
   useAutoStartVoice,
   useAudioRecorder,
-  useVADRecorder,
   useVoiceInteraction,
 } from '../hooks/useVoice';
 import { useVoiceContext } from '../hooks/useVoiceContext';
 
-type VoiceMode = 'ptt' | 'vad';
+type VoiceMode = 'ptt' | 'live';
 
 interface VoiceMessage {
   id: string;
@@ -21,11 +20,74 @@ interface VoiceInterfaceProps {
   defaultMode?: VoiceMode;
 }
 
+class AudioStreamPlayer {
+  private context: AudioContext | null = null;
+  private nextStartTime = 0;
+  private closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  enqueue(base64Chunk: string, sampleRate: number) {
+    if (!base64Chunk) {
+      return;
+    }
+    if (!this.context || this.context.sampleRate !== sampleRate) {
+      this.reset(sampleRate);
+    }
+    if (!this.context) {
+      return;
+    }
+    const samples = decodeAudioChunk(base64Chunk);
+    if (samples.length === 0) {
+      return;
+    }
+    const buffer = this.context.createBuffer(1, samples.length, sampleRate);
+    buffer.copyToChannel(samples, 0);
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.context.destination);
+    const startAt = Math.max(this.context.currentTime, this.nextStartTime);
+    source.start(startAt);
+    this.nextStartTime = startAt + buffer.duration;
+  }
+
+  reset(sampleRate: number) {
+    this.stop();
+    this.context = new AudioContext({ sampleRate });
+    this.nextStartTime = this.context.currentTime;
+  }
+
+  stop() {
+    if (!this.context) {
+      return;
+    }
+    const context = this.context;
+    const delay = Math.max(0, this.nextStartTime - context.currentTime);
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer);
+    }
+    this.closeTimer = setTimeout(() => {
+      context.close();
+    }, (delay + 0.05) * 1000);
+    this.context = null;
+    this.nextStartTime = 0;
+  }
+}
+
+function decodeAudioChunk(base64Chunk: string): Float32Array {
+  const binaryString = atob(base64Chunk);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Float32Array(bytes.buffer);
+}
+
 export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceInterfaceProps) {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [isHolding, setIsHolding] = useState(false);
   const [mode, setMode] = useState<VoiceMode>(defaultMode);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const audioStreamRef = useRef<AudioStreamPlayer | null>(null);
 
   // Auto-start voice server with loading progress
   const {
@@ -43,82 +105,95 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     isSignificantlyStale,
   } = useVoiceContext({ enabled: status?.ready });
 
-  // Push-to-talk recorder
   const {
-    isRecording: isPTTRecording,
-    audioBase64: pttAudioBase64,
+    isRecording,
+    audioBase64,
     duration,
-    error: pttRecorderError,
+    error: recorderError,
     startRecording,
     stopRecording,
-    clearRecording: clearPTTRecording,
+    clearRecording,
   } = useAudioRecorder();
-
-  // Voice Activity Detection recorder
-  const {
-    isListening,
-    isRecording: isVADRecording,
-    audioBase64: vadAudioBase64,
-    error: vadRecorderError,
-    startListening,
-    stopListening,
-    clearRecording: clearVADRecording,
-  } = useVADRecorder();
 
   const {
     isProcessing,
     error: interactionError,
-    sendVoice,
+    streamVoice,
   } = useVoiceInteraction();
-
-  // Active recording state based on mode
-  const isRecording = mode === 'ptt' ? isPTTRecording : isVADRecording;
-  const audioBase64 = mode === 'ptt' ? pttAudioBase64 : vadAudioBase64;
-  const recorderError = mode === 'ptt' ? pttRecorderError : vadRecorderError;
-  const clearRecording = mode === 'ptt' ? clearPTTRecording : clearVADRecording;
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      audioStreamRef.current?.stop();
+    };
+  }, []);
 
   // Process recorded audio when recording stops
   useEffect(() => {
     if (!isRecording && audioBase64 && !isProcessing) {
       handleSendVoice(audioBase64);
     }
-  }, [isRecording, audioBase64]);
+  }, [isRecording, audioBase64, isProcessing]);
 
   const handleSendVoice = async (audio: string) => {
+    const userId = crypto.randomUUID();
+    const assistantId = crypto.randomUUID();
+    const userMessage: VoiceMessage = {
+      id: userId,
+      type: 'user',
+      text: '(listening...)',
+      timestamp: new Date(),
+    };
+    const assistantMessage: VoiceMessage = {
+      id: assistantId,
+      type: 'assistant',
+      text: '',
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+
+    audioStreamRef.current?.stop();
+    audioStreamRef.current = new AudioStreamPlayer();
+    let assistantText = '';
+
     try {
-      // Add user message placeholder
-      const userMessage: VoiceMessage = {
-        id: crypto.randomUUID(),
-        type: 'user',
-        text: '(listening...)',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, userMessage]);
-
-      // Use context-aware system prompt for voice interactions
-      const response = await sendVoice(audio, 'interleaved', systemPrompt);
-
-      // Update user message with transcription (if available in future)
-      // and add assistant response
-      setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { ...userMessage, text: '(voice input)' },
-        {
-          id: crypto.randomUUID(),
-          type: 'assistant',
-          text: response.text,
-          timestamp: new Date(),
+      await streamVoice(audio, {
+        mode: 'interleaved',
+        systemPrompt,
+        onTextChunk: (chunk) => {
+          assistantText += chunk;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, text: assistantText } : msg
+            )
+          );
         },
-      ]);
-
-      clearRecording();
+        onAudioChunk: (chunk, sampleRate) => {
+          audioStreamRef.current?.enqueue(chunk, sampleRate);
+        },
+        onDone: () => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === userId ? { ...msg, text: '(voice input)' } : msg
+            )
+          );
+          audioStreamRef.current?.stop();
+        },
+        onError: () => {
+          audioStreamRef.current?.stop();
+        },
+      });
     } catch {
-      // Error is handled by the hook
+      audioStreamRef.current?.stop();
+    } finally {
       clearRecording();
     }
   };
@@ -126,6 +201,9 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
   // Keyboard handler for spacebar push-to-talk
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (mode !== 'ptt') {
+        return;
+      }
       if (e.code === 'Space' && !e.repeat && status?.ready && !isHolding) {
         e.preventDefault();
         setIsHolding(true);
@@ -134,6 +212,9 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (mode !== 'ptt') {
+        return;
+      }
       if (e.code === 'Space' && isHolding) {
         e.preventDefault();
         setIsHolding(false);
@@ -148,33 +229,45 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [status?.ready, isHolding, startRecording, stopRecording]);
+  }, [mode, status?.ready, isHolding, startRecording, stopRecording]);
 
   // Mouse/touch handlers for the record button
   const handleRecordStart = () => {
-    if (status?.ready) {
+    if (mode === 'ptt' && status?.ready) {
       setIsHolding(true);
       startRecording();
     }
   };
 
   const handleRecordEnd = () => {
-    if (isHolding) {
+    if (mode === 'ptt' && isHolding) {
       setIsHolding(false);
       stopRecording();
     }
   };
 
-  const error = serverError || recorderError || interactionError;
-
-  // Toggle VAD listening when mode changes
-  useEffect(() => {
-    if (mode === 'vad' && status?.ready && !isListening) {
-      startListening();
-    } else if (mode === 'ptt' && isListening) {
-      stopListening();
+  const handleLiveToggle = () => {
+    if (!status?.ready || isProcessing) {
+      return;
     }
-  }, [mode, status?.ready, isListening, startListening, stopListening]);
+    if (isRecording) {
+      stopRecording();
+    } else {
+      clearRecording();
+      startRecording();
+    }
+  };
+
+  useEffect(() => {
+    if (mode !== 'ptt') {
+      setIsHolding(false);
+    }
+    if (isRecording) {
+      stopRecording();
+    }
+  }, [mode, isRecording, stopRecording]);
+
+  const error = serverError || recorderError || interactionError;
 
   return (
     <div className="voice-interface">
@@ -215,13 +308,13 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
                 PTT
               </button>
               <button
-                className={`mode-btn ${mode === 'vad' ? 'active' : ''}`}
-                onClick={() => setMode('vad')}
+                className={`mode-btn ${mode === 'live' ? 'active' : ''}`}
+                onClick={() => setMode('live')}
                 role="radio"
-                aria-checked={mode === 'vad'}
-                aria-label="Voice Activity Detection mode: Auto-detects speech"
+                aria-checked={mode === 'live'}
+                aria-label="Live mode: continuous listening with model turn handling"
               >
-                VAD
+                Live
               </button>
             </div>
           )}
@@ -239,6 +332,7 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
         role="log"
         aria-live="polite"
         aria-label="Voice conversation"
+        ref={messagesContainerRef}
       >
         {messages.map((msg) => (
           <div
@@ -302,7 +396,13 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           </>
         ) : (
           <>
-            <div className={`vad-indicator ${isListening ? 'listening' : ''} ${isRecording ? 'recording' : ''}`}>
+            <button
+              className={`vad-indicator ${isRecording ? 'listening recording' : ''}`}
+              onClick={handleLiveToggle}
+              disabled={!status?.ready || isProcessing}
+              aria-label={isRecording ? 'Stop listening' : 'Start listening'}
+              aria-pressed={isRecording}
+            >
               <div className="vad-rings">
                 <div className="ring ring-1" />
                 <div className="ring ring-2" />
@@ -313,13 +413,15 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
                   <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15a.998.998 0 00-.98-.85c-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" />
                 </svg>
               </div>
-            </div>
+            </button>
             <div className="voice-hint">
-              {isRecording
-                ? 'Listening...'
-                : isListening
-                  ? 'Speak now - auto-detects voice'
-                  : 'Starting VAD...'}
+              {!status?.ready
+                ? 'Loading voice engine...'
+                : isRecording
+                  ? 'Listening... click to stop'
+                  : isProcessing
+                    ? 'Processing...'
+                    : 'Click to start listening'}
             </div>
           </>
         )}
@@ -598,6 +700,15 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           display: flex;
           align-items: center;
           justify-content: center;
+          background: transparent;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+        }
+
+        .vad-indicator:disabled {
+          cursor: not-allowed;
+          opacity: 0.5;
         }
 
         .vad-rings {
