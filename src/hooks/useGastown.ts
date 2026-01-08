@@ -8,15 +8,16 @@ import type {
   CommandResult,
   TmuxSession,
   ActivityItem,
+  Rig,
+  Polecat,
 } from '../types/gastown'
 
-// Additional types from rig view
-export interface Polecat {
-  name: string
-  rig: string
-  status: 'active' | 'idle' | 'stuck'
-  currentWork?: string
-  branch?: string
+// Additional types for local use (re-export from types)
+export type { Bead, BeadStatus, Rig, Polecat }
+
+// Extended Rig type with health status for comparison view
+export interface RigWithHealth extends Rig {
+  health: 'healthy' | 'degraded' | 'unhealthy'
 }
 
 export interface CrewMember {
@@ -183,7 +184,7 @@ function parsePolecatsOutput(output: string, rigName: string): Polecat[] {
         name: parts[0].replace(/[^\w-]/g, ''),
         rig: rigName,
         status: line.includes('active') ? 'active' : line.includes('stuck') ? 'stuck' : 'idle',
-        currentWork: undefined,
+        current_work: undefined,
       })
     }
   }
@@ -717,4 +718,118 @@ function compareVersions(a: string, b: string): number {
     if (numA < numB) return -1
   }
   return 0
+}
+
+/**
+ * Parse polecat list output for comparison view
+ */
+function parsePolecatListForComparison(output: string, rigName: string): Polecat[] {
+  const lines = output.split('\n').filter(line => line.trim())
+  const polecats: Polecat[] = []
+
+  for (const line of lines) {
+    // Parse polecat lines like: "nux [active] - Working on ga-xxx"
+    const match = line.match(/^(\S+)\s+\[(\w+)\](?:\s+-\s+(.+))?$/)
+    if (match) {
+      const statusMap: Record<string, Polecat['status']> = {
+        active: 'active',
+        idle: 'idle',
+        stuck: 'stuck',
+        error: 'stuck',
+        offline: 'offline',
+      }
+      polecats.push({
+        name: match[1],
+        rig: rigName,
+        status: statusMap[match[2]] || 'idle',
+        current_work: match[3],
+      })
+    }
+  }
+
+  return polecats
+}
+
+/**
+ * Hook for fetching detailed rig status with polecats and beads for comparison
+ */
+export function useRigStatus(rigName: string) {
+  return useQuery({
+    queryKey: ['rig', rigName, 'status'],
+    queryFn: async (): Promise<RigWithHealth> => {
+      // Get polecat list for this rig
+      const polecatResult = await runCommand('gt', ['polecat', 'list', rigName])
+      const polecats = polecatResult.exit_code === 0
+        ? parsePolecatListForComparison(polecatResult.stdout, rigName)
+        : []
+
+      // Get beads stats for this rig
+      const statsResult = await runCommand('bd', ['stats', '--json'])
+      let beads_count = { open: 0, in_progress: 0, closed: 0, blocked: 0 }
+
+      if (statsResult.exit_code === 0) {
+        try {
+          const stats = JSON.parse(statsResult.stdout)
+          beads_count = {
+            open: stats.open || 0,
+            in_progress: stats.in_progress || 0,
+            closed: stats.closed || 0,
+            blocked: stats.blocked || 0,
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
+      // Determine health based on blocked count and polecat status
+      const hasErrors = polecats.some(p => p.status === 'stuck')
+      const hasBlocked = beads_count.blocked > 0
+      const health: RigWithHealth['health'] = hasErrors ? 'unhealthy' : hasBlocked ? 'degraded' : 'healthy'
+
+      return {
+        name: rigName,
+        path: '',
+        polecats,
+        beads_count,
+        health,
+      }
+    },
+    refetchInterval: 5000,
+    enabled: !!rigName,
+  })
+}
+
+/**
+ * Hook for fetching multiple rig statuses for comparison
+ */
+export function useRigComparison(rigNames: string[]) {
+  return useQuery({
+    queryKey: ['rigs', 'comparison', rigNames],
+    queryFn: async (): Promise<RigWithHealth[]> => {
+      const results = await Promise.all(
+        rigNames.map(async (name) => {
+          // Get polecat list for this rig
+          const polecatResult = await runCommand('gt', ['polecat', 'list', name])
+          const polecats = polecatResult.exit_code === 0
+            ? parsePolecatListForComparison(polecatResult.stdout, name)
+            : []
+
+          // Determine health
+          const hasErrors = polecats.some(p => p.status === 'stuck')
+          const health: RigWithHealth['health'] = hasErrors ? 'unhealthy' : 'healthy'
+
+          return {
+            name,
+            path: '',
+            polecats,
+            beads_count: { open: 0, in_progress: 0, closed: 0, blocked: 0 },
+            health,
+          }
+        })
+      )
+      return results
+    },
+    refetchInterval: 5000,
+    enabled: rigNames.length > 0,
+  })
 }
