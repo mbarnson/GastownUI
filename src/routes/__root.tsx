@@ -5,6 +5,8 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
+import { LiveRegionProvider } from '../components/a11y/LiveRegion'
+import { SkipLink } from '../components/a11y/AccessibleElement'
 
 import appCss from '../styles.css?url'
 
@@ -41,7 +43,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <CalmModeProvider>
         <SimplifyModeProvider>
-          <RootBody>{children}</RootBody>
+          <LiveRegionProvider>
+            <RootBody>{children}</RootBody>
+          </LiveRegionProvider>
         </SimplifyModeProvider>
       </CalmModeProvider>
     </html>
@@ -53,8 +57,11 @@ function RootBody({ children }: { children: React.ReactNode }) {
 
   return (
     <body className={isCalm ? 'calm-mode' : ''}>
+      <SkipLink href="#main-content" />
       <Header />
-      {children}
+      <main id="main-content">
+        {children}
+      </main>
       <TanStackDevtools
         config={{
           position: 'bottom-right',
