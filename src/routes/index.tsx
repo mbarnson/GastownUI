@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
 import { SelfTestPanel } from '../components/SelfTestPanel'
@@ -6,30 +6,24 @@ import { TmuxPanel } from '../components/TmuxPanel'
 import { DeepQueryPanel } from '../components/DeepQueryPanel'
 import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
 import { SetupBanner } from '../components/SetupBanner'
-import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
+import { useConvoys, useBeads } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
 import { useSetupStatus, isSetupComplete } from '../hooks/useSetup'
 import { useSetupPreferences } from '../hooks/useSetupPreferences'
+import { useSidebarMode } from '../contexts/SidebarModeContext'
 import {
   Truck,
-  Terminal,
   Circle,
-  Activity,
   AlertTriangle,
-  TestTube2,
-  Brain,
   GitBranch,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
 
-type SidebarMode = 'voice' | 'selfTest' | 'deepQuery'
-
 function Dashboard() {
   const navigate = useNavigate()
-  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('voice')
+  const { sidebarMode } = useSidebarMode()
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
-  const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
   const { data: molecules } = useActiveMolecules()
   const { data: setupStatus, isLoading: setupLoading } = useSetupStatus()
@@ -50,55 +44,6 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      {/* Header */}
-      <header className="border-b border-slate-700 bg-slate-900/50 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-black text-white">
-              <span className="text-gray-400">GAS</span>{' '}
-              <span className="text-rose-500">TOWN</span>
-            </h1>
-            <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded">
-              Active
-            </span>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-gray-400">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4" />
-              <span>{convoys?.length || 0} Convoys</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Terminal className="w-4 h-4" />
-              <span>{sessions?.length || 0} Sessions</span>
-            </div>
-            <button
-              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
-                sidebarMode === 'deepQuery'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'hover:bg-slate-700'
-              }`}
-              onClick={() => setSidebarMode(sidebarMode === 'deepQuery' ? 'voice' : 'deepQuery')}
-              title="Deep Query - AI Analysis"
-            >
-              <Brain className="w-4 h-4" />
-              <span>Query</span>
-            </button>
-            <button
-              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
-                sidebarMode === 'selfTest'
-                  ? 'bg-amber-500/20 text-amber-400'
-                  : 'hover:bg-slate-700'
-              }`}
-              onClick={() => setSidebarMode(sidebarMode === 'selfTest' ? 'voice' : 'selfTest')}
-              title="Voice Self-Test"
-            >
-              <TestTube2 className="w-4 h-4" />
-              <span>Self-Test</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
       <main id="main-content" className="max-w-7xl mx-auto px-6 py-8">
         {/* Setup Banner - shown when setup was skipped or interrupted */}
         <SetupBanner className="mb-6" />
@@ -133,8 +78,8 @@ function Dashboard() {
                       </div>
                       <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
                         <span>{convoy.status}</span>
-                        {convoy.polecats.length > 0 && (
-                          <span>{convoy.polecats.length} polecats</span>
+                        {(convoy.polecats?.length ?? 0) > 0 && (
+                          <span>{convoy.polecats?.length ?? 0} polecats</span>
                         )}
                       </div>
                     </div>

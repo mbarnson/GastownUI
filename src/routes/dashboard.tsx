@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   Factory,
   Truck,
@@ -24,25 +23,7 @@ import type { Convoy, ActivityItem, Bead, TownStatus as TownStatusType } from '.
 
 export const Route = createFileRoute('/dashboard')({ component: Dashboard })
 
-// Create a query client for this route
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: true,
-    },
-  },
-})
-
 function Dashboard() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <DashboardContent />
-    </QueryClientProvider>
-  )
-}
-
-function DashboardContent() {
   const { data: townStatus, isLoading: townLoading } = useTownStatus()
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: activity, isLoading: activityLoading } = useActivityFeed()

@@ -1,11 +1,23 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
+import { SidebarModeProvider } from '../contexts/SidebarModeContext'
 
 import appCss from '../styles.css?url'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: true,
+    },
+  },
+})
 
 export const Route = createRootRoute({
   head: () => ({
@@ -47,23 +59,33 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function RootBody({ children }: { children: React.ReactNode }) {
   const { isCalm } = useCalmMode()
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual'
+    }
+    window.scrollTo(0, 0)
+  }, [])
 
   return (
     <body className={isCalm ? 'calm-mode' : ''}>
-      <Header />
-      {children}
-      <TanStackDevtools
-        config={{
-          position: 'bottom-right',
-        }}
-        plugins={[
-          {
-            name: 'Tanstack Router',
-            render: <TanStackRouterDevtoolsPanel />,
-          },
-        ]}
-      />
-      <Scripts />
+      <QueryClientProvider client={queryClient}>
+        <SidebarModeProvider>
+          <Header />
+          {children}
+          <TanStackDevtools
+            config={{
+              position: 'bottom-right',
+            }}
+            plugins={[
+              {
+                name: 'Tanstack Router',
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
+          <Scripts />
+        </SidebarModeProvider>
+      </QueryClientProvider>
     </body>
   )
 }

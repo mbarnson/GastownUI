@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types matching Rust structs
@@ -13,6 +14,15 @@ export interface VoiceResponse {
   text: string;
   audio_base64: string | null;
   audio_sample_rate: number;
+}
+
+export interface VoiceStreamEvent {
+  streamId: string;
+  event: 'text' | 'audio' | 'done' | 'error';
+  text?: string;
+  audioBase64?: string;
+  audioSampleRate?: number;
+  message?: string;
 }
 
 export interface VoiceServerConfig {
@@ -59,6 +69,52 @@ export function useVoiceServer() {
     start: startMutation.mutate,
     stop: stopMutation.mutate,
     error: startMutation.error || stopMutation.error,
+  };
+}
+
+export function useAutoStartVoice(autoStart = true) {
+  const { status, isLoading, isStarting, start, error } = useVoiceServer();
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('Starting voice server...');
+  const hasStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (!autoStart) {
+      return;
+    }
+    if (status?.running || isStarting || hasStartedRef.current) {
+      return;
+    }
+    hasStartedRef.current = true;
+    start();
+  }, [autoStart, status?.running, isStarting, start]);
+
+  useEffect(() => {
+    if (status?.ready) {
+      setLoadingProgress(100);
+      setLoadingMessage('Ready');
+      return;
+    }
+    if (status?.running) {
+      setLoadingProgress(70);
+      setLoadingMessage('Loading voice model...');
+      return;
+    }
+    if (isStarting || isLoading) {
+      setLoadingProgress(30);
+      setLoadingMessage('Starting voice server...');
+      return;
+    }
+    setLoadingProgress(0);
+    setLoadingMessage('Voice server stopped');
+  }, [status?.ready, status?.running, isStarting, isLoading]);
+
+  return {
+    status,
+    isStarting,
+    loadingProgress,
+    loadingMessage,
+    error,
   };
 }
 
@@ -191,6 +247,15 @@ export interface VoiceInputOptions {
   polecatName?: string;
 }
 
+export interface VoiceStreamOptions extends VoiceInputOptions {
+  resetContext?: boolean;
+  systemPrompt?: string;
+  onTextChunk?: (text: string) => void;
+  onAudioChunk?: (audioBase64: string, sampleRate: number) => void;
+  onError?: (message: string) => void;
+  onDone?: (fullText: string) => void;
+}
+
 /**
  * Hook for voice interactions (sending voice, getting responses)
  */
@@ -226,6 +291,76 @@ export function useVoiceInteraction() {
       setError(message);
       throw err;
     } finally {
+      setIsProcessing(false);
+    }
+  }, []);
+
+  const streamVoice = useCallback(async (
+    audioBase64: string,
+    options?: VoiceStreamOptions
+  ) => {
+    setIsProcessing(true);
+    setError(null);
+
+    const streamId = crypto.randomUUID();
+    let fullText = '';
+    let lastSampleRate = 24000;
+    let unlisten: (() => void) | null = null;
+
+    try {
+      unlisten = await listen<VoiceStreamEvent>('voice_stream', (event) => {
+        const payload = event.payload;
+        if (payload.streamId !== streamId) {
+          return;
+        }
+
+        if (payload.event === 'text' && payload.text) {
+          fullText += payload.text;
+          options?.onTextChunk?.(payload.text);
+        }
+
+        if (payload.event === 'audio' && payload.audioBase64) {
+          const sampleRate = payload.audioSampleRate ?? 24000;
+          lastSampleRate = sampleRate;
+          options?.onAudioChunk?.(payload.audioBase64, sampleRate);
+        }
+
+        if (payload.event === 'error') {
+          const message = payload.message || 'Voice stream error';
+          setError(message);
+          options?.onError?.(message);
+        }
+
+        if (payload.event === 'done') {
+          options?.onDone?.(fullText);
+        }
+      });
+
+      await invoke('stream_voice_input', {
+        audioBase64,
+        mode: options?.mode,
+        persona: options?.persona,
+        polecatName: options?.polecatName,
+        resetContext: options?.resetContext,
+        systemPrompt: options?.systemPrompt,
+        streamId,
+      });
+
+      const response = {
+        text: fullText,
+        audio_base64: null,
+        audio_sample_rate: lastSampleRate,
+      };
+      setLastResponse(response);
+      return response;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      throw err;
+    } finally {
+      if (unlisten) {
+        unlisten();
+      }
       setIsProcessing(false);
     }
   }, []);
@@ -273,6 +408,7 @@ export function useVoiceInteraction() {
     lastResponse,
     error,
     sendVoice,
+    streamVoice,
     transcribe,
     speak,
   };

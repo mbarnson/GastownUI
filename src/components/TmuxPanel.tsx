@@ -277,3 +277,5 @@ export function TmuxPanel() {
     </div>
   )
 }
+
+export default TmuxPanel

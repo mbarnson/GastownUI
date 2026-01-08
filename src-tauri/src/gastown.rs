@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommandResult {
@@ -44,11 +45,34 @@ pub struct Molecule {
     pub status: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TmuxSession {
     pub name: String,
     pub windows: i32,
     pub attached: bool,
+    pub activity: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TmuxPane {
+    pub session_name: String,
+    pub window_index: i32,
+    pub window_name: String,
+    pub pane_index: i32,
+    pub pane_id: String,
+    pub pane_active: bool,
+    pub pane_current_command: String,
+    pub pane_pid: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TmuxSessionDetail {
+    pub session: TmuxSession,
+    pub panes: Vec<TmuxPane>,
+    pub health: String,
+    pub connection_string: String,
 }
 
 /// Run a gt or bd command and return the output
@@ -77,7 +101,11 @@ pub async fn read_beads_file(path: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn list_tmux_sessions() -> Result<Vec<TmuxSession>, String> {
     let output = Command::new("tmux")
-        .args(["list-sessions", "-F", "#{session_name}:#{session_windows}:#{session_attached}"])
+        .args([
+            "list-sessions",
+            "-F",
+            "#{session_name}\t#{session_windows}\t#{session_attached}\t#{session_activity}",
+        ])
         .output()
         .map_err(|e| format!("Failed to list tmux sessions: {}", e))?;
 
@@ -90,12 +118,13 @@ pub async fn list_tmux_sessions() -> Result<Vec<TmuxSession>, String> {
     let sessions: Vec<TmuxSession> = stdout
         .lines()
         .filter_map(|line| {
-            let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() >= 3 {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 4 {
                 Some(TmuxSession {
                     name: parts[0].to_string(),
                     windows: parts[1].parse().unwrap_or(0),
                     attached: parts[2] == "1",
+                    activity: parts[3].parse().ok(),
                 })
             } else {
                 None
@@ -104,6 +133,155 @@ pub async fn list_tmux_sessions() -> Result<Vec<TmuxSession>, String> {
         .collect();
 
     Ok(sessions)
+}
+
+#[tauri::command]
+pub async fn get_tmux_panes(session_name: String) -> Result<Vec<TmuxPane>, String> {
+    let output = Command::new("tmux")
+        .args([
+            "list-panes",
+            "-t",
+            &session_name,
+            "-F",
+            "#{session_name}\t#{window_index}\t#{window_name}\t#{pane_index}\t#{pane_id}\t#{pane_active}\t#{pane_current_command}\t#{pane_pid}",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to list tmux panes: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to list tmux panes: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let panes: Vec<TmuxPane> = stdout
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 8 {
+                Some(TmuxPane {
+                    session_name: parts[0].to_string(),
+                    window_index: parts[1].parse().unwrap_or(0),
+                    window_name: parts[2].to_string(),
+                    pane_index: parts[3].parse().unwrap_or(0),
+                    pane_id: parts[4].to_string(),
+                    pane_active: parts[5] == "1",
+                    pane_current_command: parts[6].to_string(),
+                    pane_pid: parts[7].parse().unwrap_or(0),
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(panes)
+}
+
+#[tauri::command]
+pub async fn capture_tmux_pane(target: String, lines: Option<i32>) -> Result<String, String> {
+    let line_count = lines.unwrap_or(30).max(1);
+    let output = Command::new("tmux")
+        .args([
+            "capture-pane",
+            "-p",
+            "-t",
+            &target,
+            "-S",
+            &format!("-{}", line_count),
+        ])
+        .output()
+        .map_err(|e| format!("Failed to capture tmux pane: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to capture tmux pane: {}", stderr));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn session_health(session: &TmuxSession, _panes: &[TmuxPane]) -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let delta = session
+        .activity
+        .map(|last| now.saturating_sub(last))
+        .unwrap_or(i64::MAX);
+
+    if delta < 10 {
+        return "active".to_string();
+    }
+
+    if delta < 60 {
+        return "processing".to_string();
+    }
+
+    "idle".to_string()
+}
+
+#[tauri::command]
+pub async fn get_session_details(session_name: String) -> Result<TmuxSessionDetail, String> {
+    let sessions = list_tmux_sessions().await?;
+    let session = sessions
+        .into_iter()
+        .find(|s| s.name == session_name)
+        .ok_or_else(|| "Tmux session not found".to_string())?;
+
+    let panes = get_tmux_panes(session.name.clone()).await.unwrap_or_default();
+    let health = session_health(&session, &panes);
+
+    Ok(TmuxSessionDetail {
+        session: session.clone(),
+        panes,
+        health,
+        connection_string: format!("tmux attach -t {}", session.name),
+    })
+}
+
+#[tauri::command]
+pub async fn attach_tmux_session(session_name: String) -> Result<(), String> {
+    let attach_cmd = format!("tmux attach -t {}", session_name);
+
+    #[cfg(target_os = "macos")]
+    {
+        let escaped = attach_cmd.replace('"', "\\\"");
+        Command::new("osascript")
+            .args([
+                "-e",
+                &format!(
+                    "tell application \"Terminal\" to do script \"{}\"",
+                    escaped
+                ),
+                "-e",
+                "tell application \"Terminal\" to activate",
+            ])
+            .output()
+            .map_err(|e| format!("Failed to launch Terminal: {}", e))?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("sh")
+            .arg("-c")
+            .arg(format!("x-terminal-emulator -e {}", attach_cmd))
+            .output()
+            .map_err(|e| format!("Failed to launch terminal: {}", e))?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "cmd", "/K", &attach_cmd])
+            .output()
+            .map_err(|e| format!("Failed to launch terminal: {}", e))?;
+        return Ok(());
+    }
 }
 
 /// Get molecule progress for a given root issue

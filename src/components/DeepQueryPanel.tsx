@@ -12,12 +12,17 @@ export function DeepQueryPanel() {
   const [query, setQuery] = useState('');
   const [history, setHistory] = useState<QueryHistoryItem[]>([]);
   const historyEndRef = useRef<HTMLDivElement>(null);
+  const historyContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: status } = useInstructStatus();
   const { queryAsync, isLoading, error, reset } = useDeepQuery();
 
   useEffect(() => {
-    historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = historyContainerRef.current;
+    if (!container) {
+      return;
+    }
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [history]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,7 +75,7 @@ export function DeepQueryPanel() {
         </div>
       )}
 
-      <div className="query-history">
+      <div className="query-history" ref={historyContainerRef}>
         {history.length === 0 && !isLoading && (
           <div className="empty-state">
             <p>Ask questions about Gas Town state</p>

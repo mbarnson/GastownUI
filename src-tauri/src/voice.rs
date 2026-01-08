@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::State;
+use tauri::{Emitter, State, Window};
+use futures_util::StreamExt;
 
 /// Voice server state managed by Tauri
 pub struct VoiceServerState {
@@ -70,6 +71,17 @@ pub struct VoiceServerStatus {
     pub running: bool,
     pub ready: bool,
     pub url: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceStreamPayload {
+    pub stream_id: String,
+    pub event: String,
+    pub text: Option<String>,
+    pub audio_base64: Option<String>,
+    pub audio_sample_rate: Option<u32>,
+    pub message: Option<String>,
 }
 
 fn get_server_path() -> Result<PathBuf, String> {
@@ -420,6 +432,208 @@ pub async fn send_voice_input(
         audio_base64,
         audio_sample_rate: 24000,
     })
+}
+
+#[tauri::command]
+pub async fn stream_voice_input(
+    window: Window,
+    state: State<'_, VoiceServerState>,
+    audio_base64: String,
+    mode: Option<String>,
+    persona: Option<AgentPersona>,
+    polecat_name: Option<String>,
+    reset_context: Option<bool>,
+    system_prompt: Option<String>,
+    stream_id: String,
+) -> Result<(), String> {
+    let (url, is_ready) = {
+        let url = state.server_url.lock().map_err(|e| e.to_string())?;
+        let ready = state.is_ready.lock().map_err(|e| e.to_string())?;
+        (url.clone(), *ready)
+    };
+
+    if !is_ready {
+        return Err("Voice server not ready".to_string());
+    }
+
+    let mode = mode.unwrap_or_else(|| "interleaved".to_string());
+    let system_prompt = system_prompt.unwrap_or_else(|| match mode.as_str() {
+        "asr" => SYSTEM_PROMPT_ASR.to_string(),
+        "tts" => SYSTEM_PROMPT_TTS.to_string(),
+        _ => match persona {
+            Some(ref p) => get_persona_prompt(p, polecat_name.as_deref()),
+            None => SYSTEM_PROMPT_INTERLEAVED.to_string(),
+        },
+    });
+
+    let client = reqwest::Client::new();
+    let api_url = format!("{}/v1/chat/completions", url);
+
+    let payload = serde_json::json!({
+        "model": "",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": audio_base64,
+                            "format": "wav"
+                        }
+                    }
+                ]
+            }
+        ],
+        "stream": true,
+        "max_tokens": 512,
+        "extra_body": {"reset_context": reset_context.unwrap_or(true)}
+    });
+
+    let response = client
+        .post(&api_url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send request: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Server error {}: {}", status, body));
+    }
+
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = match chunk {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                let _ = window.emit(
+                    "voice_stream",
+                    VoiceStreamPayload {
+                        stream_id: stream_id.clone(),
+                        event: "error".to_string(),
+                        text: None,
+                        audio_base64: None,
+                        audio_sample_rate: None,
+                        message: Some(format!("Stream error: {}", error)),
+                    },
+                );
+                return Err(format!("Stream error: {}", error));
+            }
+        };
+
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+        while let Some(pos) = buffer.find('\n') {
+            let line = buffer[..pos].trim().to_string();
+            buffer = buffer[pos + 1..].to_string();
+
+            if line.is_empty() {
+                continue;
+            }
+
+            let data = match line.strip_prefix("data:") {
+                Some(value) => value.trim(),
+                None => continue,
+            };
+
+            if data == "[DONE]" {
+                let _ = window.emit(
+                    "voice_stream",
+                    VoiceStreamPayload {
+                        stream_id: stream_id.clone(),
+                        event: "done".to_string(),
+                        text: None,
+                        audio_base64: None,
+                        audio_sample_rate: None,
+                        message: None,
+                    },
+                );
+                return Ok(());
+            }
+
+            let parsed: serde_json::Value = match serde_json::from_str(data) {
+                Ok(value) => value,
+                Err(error) => {
+                    let _ = window.emit(
+                        "voice_stream",
+                        VoiceStreamPayload {
+                            stream_id: stream_id.clone(),
+                            event: "error".to_string(),
+                            text: None,
+                            audio_base64: None,
+                            audio_sample_rate: None,
+                            message: Some(format!("Stream parse error: {}", error)),
+                        },
+                    );
+                    return Err(format!("Stream parse error: {}", error));
+                }
+            };
+
+            let choice = &parsed["choices"][0];
+            let delta = &choice["delta"];
+
+            if let Some(text) = delta["content"].as_str() {
+                let _ = window.emit(
+                    "voice_stream",
+                    VoiceStreamPayload {
+                        stream_id: stream_id.clone(),
+                        event: "text".to_string(),
+                        text: Some(text.to_string()),
+                        audio_base64: None,
+                        audio_sample_rate: None,
+                        message: None,
+                    },
+                );
+            }
+
+            if let Some(audio) = delta["audio_chunk"]["data"].as_str() {
+                let _ = window.emit(
+                    "voice_stream",
+                    VoiceStreamPayload {
+                        stream_id: stream_id.clone(),
+                        event: "audio".to_string(),
+                        text: None,
+                        audio_base64: Some(audio.to_string()),
+                        audio_sample_rate: Some(24000),
+                        message: None,
+                    },
+                );
+            }
+
+            if choice["finish_reason"].as_str() == Some("stop") {
+                let _ = window.emit(
+                    "voice_stream",
+                    VoiceStreamPayload {
+                        stream_id: stream_id.clone(),
+                        event: "done".to_string(),
+                        text: None,
+                        audio_base64: None,
+                        audio_sample_rate: None,
+                        message: None,
+                    },
+                );
+                return Ok(());
+            }
+        }
+    }
+
+    let _ = window.emit(
+        "voice_stream",
+        VoiceStreamPayload {
+            stream_id,
+            event: "done".to_string(),
+            text: None,
+            audio_base64: None,
+            audio_sample_rate: None,
+            message: None,
+        },
+    );
+    Ok(())
 }
 
 #[tauri::command]
