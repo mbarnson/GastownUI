@@ -3,7 +3,7 @@ import { useSelfTestStatus, useTestCases, useSelfTest, TestResult } from '../hoo
 
 export function SelfTestPanel() {
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
-  const { data: status, isLoading: statusLoading } = useSelfTestStatus();
+  const { data: status } = useSelfTestStatus();
   const { data: testCases } = useTestCases();
   const { start, stop, isStarting, isStopping, error } = useSelfTest();
 
