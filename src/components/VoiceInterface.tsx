@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useVoiceServer, useAudioRecorder, useVoiceInteraction } from '../hooks/useVoice';
+import {
+  parseActions,
+  executeActions,
+  extractNonActionText,
+  hasActions,
+  formatResultsForVoice,
+} from '../voice/actions';
+import { getMailbox, type MailMessage } from '../voice/mail';
 
 interface VoiceMessage {
   id: string;
@@ -42,6 +50,37 @@ export function VoiceInterface() {
     }
   }, [isRecording, audioBase64]);
 
+  // Start mail polling when voice server is ready
+  useEffect(() => {
+    if (!status?.ready) return;
+
+    const mailbox = getMailbox();
+
+    // Handle incoming mail notifications
+    const unsubscribe = mailbox.onNewMail(async (msg: MailMessage) => {
+      const announcement = mailbox.formatAnnouncement(msg);
+
+      // Add notification message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: 'assistant',
+          text: `📬 ${announcement}`,
+          timestamp: new Date(),
+        },
+      ]);
+    });
+
+    // Start polling for mail
+    mailbox.startPolling(5000);
+
+    return () => {
+      unsubscribe();
+      mailbox.stopPolling();
+    };
+  }, [status?.ready]);
+
   const handleSendVoice = async (audio: string) => {
     try {
       // Add user message placeholder
@@ -63,6 +102,21 @@ export function VoiceInterface() {
 
       const response = await sendVoice(audio, 'interleaved');
 
+      // Check for ACTION: intents in model output
+      let responseText = response.text;
+      if (hasActions(response.text)) {
+        // Parse and execute actions
+        const actions = parseActions(response.text);
+        const results = await executeActions(actions);
+
+        // Extract non-action text for voice response
+        const nonActionText = extractNonActionText(response.text);
+        const actionFeedback = formatResultsForVoice(results);
+
+        // Combine non-action text with action feedback
+        responseText = [nonActionText, actionFeedback].filter(Boolean).join(' ');
+      }
+
       // Update user message with actual transcription and add assistant response
       setMessages((prev) => [
         ...prev.slice(0, -1),
@@ -70,7 +124,7 @@ export function VoiceInterface() {
         {
           id: crypto.randomUUID(),
           type: 'assistant',
-          text: response.text,
+          text: responseText,
           timestamp: new Date(),
         },
       ]);
