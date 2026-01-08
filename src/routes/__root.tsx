@@ -5,6 +5,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
+import { SidebarModeProvider } from '../contexts/SidebarModeContext'
 import SkipLink from '../components/SkipLink'
 import VoiceControlOverlay from '../components/VoiceControlOverlay'
 
@@ -43,7 +44,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <CalmModeProvider>
         <SimplifyModeProvider>
-          <RootBody>{children}</RootBody>
+          <SidebarModeProvider>
+            <RootBody>{children}</RootBody>
+          </SidebarModeProvider>
         </SimplifyModeProvider>
       </CalmModeProvider>
     </html>
