@@ -352,3 +352,242 @@ async function playAudio(base64: string, sampleRate: number): Promise<void> {
     };
   });
 }
+
+/**
+ * Voice Activity Detection (VAD) configuration
+ */
+export interface VADConfig {
+  /** RMS threshold for detecting speech (0-1, default 0.01) */
+  threshold: number;
+  /** Minimum silence duration before stopping (ms, default 1500) */
+  silenceTimeout: number;
+  /** Minimum speech duration before considering valid (ms, default 300) */
+  minSpeechDuration: number;
+}
+
+const DEFAULT_VAD_CONFIG: VADConfig = {
+  threshold: 0.01,
+  silenceTimeout: 1500,
+  minSpeechDuration: 300,
+};
+
+/**
+ * Hook for Voice Activity Detection recording
+ * Automatically starts/stops recording based on detected speech
+ */
+export function useVADRecorder(config: Partial<VADConfig> = {}) {
+  const vadConfig = { ...DEFAULT_VAD_CONFIG, ...config };
+
+  const [isListening, setIsListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechStartRef = useRef<number>(0);
+  const animationFrameRef = useRef<number>(0);
+
+  const stopListening = useCallback(() => {
+    setIsListening(false);
+    setIsRecording(false);
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+
+    streamRef.current = null;
+    audioContextRef.current = null;
+    analyserRef.current = null;
+    mediaRecorderRef.current = null;
+  }, []);
+
+  const startListening = useCallback(async () => {
+    try {
+      setError(null);
+      setAudioBase64(null);
+      chunksRef.current = [];
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      streamRef.current = stream;
+
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      audioContextRef.current = audioContext;
+
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+      });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const speechDuration = Date.now() - speechStartRef.current;
+
+        // Only process if speech was long enough
+        if (speechDuration >= vadConfig.minSpeechDuration && chunksRef.current.length > 0) {
+          const webmBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          const wavBlob = await convertToWav(webmBlob);
+          const base64 = await blobToBase64(wavBlob);
+          setAudioBase64(base64);
+        }
+
+        chunksRef.current = [];
+        setIsRecording(false);
+      };
+
+      setIsListening(true);
+
+      // VAD loop
+      const dataArray = new Float32Array(analyser.frequencyBinCount);
+
+      const checkAudio = () => {
+        if (!analyserRef.current || !isListening) return;
+
+        analyser.getFloatTimeDomainData(dataArray);
+
+        // Calculate RMS
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i] * dataArray[i];
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+
+        if (rms > vadConfig.threshold) {
+          // Speech detected
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+          }
+
+          if (!isRecording && mediaRecorderRef.current?.state === 'inactive') {
+            // Start recording
+            speechStartRef.current = Date.now();
+            mediaRecorderRef.current.start(100);
+            setIsRecording(true);
+          }
+        } else if (isRecording) {
+          // Silence detected while recording
+          if (!silenceTimerRef.current) {
+            silenceTimerRef.current = setTimeout(() => {
+              // Stop recording after silence timeout
+              if (mediaRecorderRef.current?.state === 'recording') {
+                mediaRecorderRef.current.stop();
+              }
+              silenceTimerRef.current = null;
+            }, vadConfig.silenceTimeout);
+          }
+        }
+
+        animationFrameRef.current = requestAnimationFrame(checkAudio);
+      };
+
+      checkAudio();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start VAD');
+      stopListening();
+    }
+  }, [vadConfig, isListening, isRecording, stopListening]);
+
+  const clearRecording = useCallback(() => {
+    setAudioBase64(null);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopListening();
+    };
+  }, [stopListening]);
+
+  return {
+    isListening,
+    isRecording,
+    audioBase64,
+    error,
+    startListening,
+    stopListening,
+    clearRecording,
+  };
+}
+
+/**
+ * Hook for auto-starting voice server on mount
+ */
+export function useAutoStartVoice(enabled: boolean = true) {
+  const { status, start, isStarting, error } = useVoiceServer();
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const startAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (enabled && !status?.running && !isStarting && !startAttemptedRef.current) {
+      startAttemptedRef.current = true;
+      setLoadingMessage('Starting voice server...');
+      start(undefined);
+    }
+  }, [enabled, status?.running, isStarting, start]);
+
+  // Simulate loading progress while waiting for server
+  useEffect(() => {
+    if (status?.running && !status.ready) {
+      setLoadingMessage('Loading LFM2.5 model (~5-10s)...');
+
+      // Estimate progress (model usually loads in 5-10 seconds)
+      const startTime = Date.now();
+      const estimatedDuration = 7500; // 7.5s average
+
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(95, (elapsed / estimatedDuration) * 100);
+        setLoadingProgress(progress);
+      }, 100);
+
+      return () => clearInterval(interval);
+    } else if (status?.ready) {
+      setLoadingProgress(100);
+      setLoadingMessage('Voice ready');
+    }
+  }, [status?.running, status?.ready]);
+
+  return {
+    status,
+    isStarting,
+    loadingProgress,
+    loadingMessage,
+    error,
+  };
+}

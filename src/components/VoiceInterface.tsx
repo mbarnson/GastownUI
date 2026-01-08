@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useVoiceServer, useAudioRecorder, useVoiceInteraction } from '../hooks/useVoice';
+import {
+  useAutoStartVoice,
+  useAudioRecorder,
+  useVADRecorder,
+  useVoiceInteraction,
+} from '../hooks/useVoice';
+
+type VoiceMode = 'ptt' | 'vad';
 
 interface VoiceMessage {
   id: string;
@@ -8,26 +15,59 @@ interface VoiceMessage {
   timestamp: Date;
 }
 
-export function VoiceInterface() {
+interface VoiceInterfaceProps {
+  autoStart?: boolean;
+  defaultMode?: VoiceMode;
+}
+
+export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceInterfaceProps) {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [isHolding, setIsHolding] = useState(false);
+  const [mode, setMode] = useState<VoiceMode>(defaultMode);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { status, isStarting, start, error: serverError } = useVoiceServer();
+  // Auto-start voice server with loading progress
   const {
-    isRecording,
-    audioBase64,
+    status,
+    isStarting,
+    loadingProgress,
+    loadingMessage,
+    error: serverError,
+  } = useAutoStartVoice(autoStart);
+
+  // Push-to-talk recorder
+  const {
+    isRecording: isPTTRecording,
+    audioBase64: pttAudioBase64,
     duration,
-    error: recorderError,
+    error: pttRecorderError,
     startRecording,
     stopRecording,
-    clearRecording,
+    clearRecording: clearPTTRecording,
   } = useAudioRecorder();
+
+  // Voice Activity Detection recorder
+  const {
+    isListening,
+    isRecording: isVADRecording,
+    audioBase64: vadAudioBase64,
+    error: vadRecorderError,
+    startListening,
+    stopListening,
+    clearRecording: clearVADRecording,
+  } = useVADRecorder();
+
   const {
     isProcessing,
     error: interactionError,
     sendVoice,
   } = useVoiceInteraction();
+
+  // Active recording state based on mode
+  const isRecording = mode === 'ptt' ? isPTTRecording : isVADRecording;
+  const audioBase64 = mode === 'ptt' ? pttAudioBase64 : vadAudioBase64;
+  const recorderError = mode === 'ptt' ? pttRecorderError : vadRecorderError;
+  const clearRecording = mode === 'ptt' ? clearPTTRecording : clearVADRecording;
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -118,23 +158,51 @@ export function VoiceInterface() {
 
   const error = serverError || recorderError || interactionError;
 
+  // Toggle VAD listening when mode changes
+  useEffect(() => {
+    if (mode === 'vad' && status?.ready && !isListening) {
+      startListening();
+    } else if (mode === 'ptt' && isListening) {
+      stopListening();
+    }
+  }, [mode, status?.ready, isListening, startListening, stopListening]);
+
   return (
     <div className="voice-interface">
       <div className="voice-header">
         <h3>Voice Assistant</h3>
         <div className="voice-status">
           {!status?.running ? (
-            <button
-              className="btn btn-primary"
-              onClick={() => start(undefined)}
-              disabled={isStarting}
-            >
-              {isStarting ? 'Starting...' : 'Start Voice'}
-            </button>
+            <div className="loading-indicator">
+              <span className="status loading">{loadingMessage || 'Starting...'}</span>
+            </div>
           ) : !status.ready ? (
-            <span className="status loading">Loading model...</span>
+            <div className="loading-indicator">
+              <span className="status loading">{loadingMessage}</span>
+              <div className="progress-bar">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
+            </div>
           ) : (
-            <span className="status ready">Ready</span>
+            <div className="mode-toggle">
+              <button
+                className={`mode-btn ${mode === 'ptt' ? 'active' : ''}`}
+                onClick={() => setMode('ptt')}
+                title="Push-to-Talk: Hold Space or button"
+              >
+                PTT
+              </button>
+              <button
+                className={`mode-btn ${mode === 'vad' ? 'active' : ''}`}
+                onClick={() => setMode('vad')}
+                title="Voice Activity Detection: Auto-detects speech"
+              >
+                VAD
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -166,40 +234,65 @@ export function VoiceInterface() {
       </div>
 
       <div className="voice-controls">
-        <button
-          className={`record-button ${isRecording ? 'recording' : ''} ${
-            !status?.ready ? 'disabled' : ''
-          }`}
-          onMouseDown={handleRecordStart}
-          onMouseUp={handleRecordEnd}
-          onMouseLeave={handleRecordEnd}
-          onTouchStart={handleRecordStart}
-          onTouchEnd={handleRecordEnd}
-          disabled={!status?.ready || isProcessing}
-        >
-          <div className="mic-icon">
-            {isRecording ? (
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="12" r="10" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15a.998.998 0 00-.98-.85c-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" />
-              </svg>
-            )}
-          </div>
-          {isRecording && (
-            <div className="recording-duration">{duration.toFixed(1)}s</div>
-          )}
-        </button>
-
-        <div className="voice-hint">
-          {status?.ready
-            ? isRecording
-              ? 'Release to send'
-              : 'Hold Space or click to talk'
-            : 'Start voice to begin'}
-        </div>
+        {mode === 'ptt' ? (
+          <>
+            <button
+              className={`record-button ${isRecording ? 'recording' : ''} ${
+                !status?.ready ? 'disabled' : ''
+              }`}
+              onMouseDown={handleRecordStart}
+              onMouseUp={handleRecordEnd}
+              onMouseLeave={handleRecordEnd}
+              onTouchStart={handleRecordStart}
+              onTouchEnd={handleRecordEnd}
+              disabled={!status?.ready || isProcessing}
+            >
+              <div className="mic-icon">
+                {isRecording ? (
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="10" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15a.998.998 0 00-.98-.85c-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" />
+                  </svg>
+                )}
+              </div>
+              {isRecording && (
+                <div className="recording-duration">{duration.toFixed(1)}s</div>
+              )}
+            </button>
+            <div className="voice-hint">
+              {status?.ready
+                ? isRecording
+                  ? 'Release to send'
+                  : 'Hold Space or click to talk'
+                : 'Loading voice engine...'}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={`vad-indicator ${isListening ? 'listening' : ''} ${isRecording ? 'recording' : ''}`}>
+              <div className="vad-rings">
+                <div className="ring ring-1" />
+                <div className="ring ring-2" />
+                <div className="ring ring-3" />
+              </div>
+              <div className="mic-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15a.998.998 0 00-.98-.85c-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" />
+                </svg>
+              </div>
+            </div>
+            <div className="voice-hint">
+              {isRecording
+                ? 'Listening...'
+                : isListening
+                  ? 'Speak now - auto-detects voice'
+                  : 'Starting VAD...'}
+            </div>
+          </>
+        )}
       </div>
 
       <style>{`
@@ -242,6 +335,57 @@ export function VoiceInterface() {
         .voice-status .status.loading {
           background: #0f3460;
           color: #f9c846;
+        }
+
+        .loading-indicator {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 4px;
+        }
+
+        .progress-bar {
+          width: 100px;
+          height: 4px;
+          background: #0f3460;
+          border-radius: 2px;
+          overflow: hidden;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #f9c846, #4ecca3);
+          border-radius: 2px;
+          transition: width 0.1s ease;
+        }
+
+        .mode-toggle {
+          display: flex;
+          gap: 4px;
+          background: #0f3460;
+          border-radius: 4px;
+          padding: 2px;
+        }
+
+        .mode-btn {
+          padding: 4px 10px;
+          border: none;
+          border-radius: 3px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          background: transparent;
+          color: #888;
+          transition: all 0.2s;
+        }
+
+        .mode-btn:hover {
+          color: #ccc;
+        }
+
+        .mode-btn.active {
+          background: #e94560;
+          color: white;
         }
 
         .voice-error {
@@ -379,6 +523,84 @@ export function VoiceInterface() {
           50% {
             box-shadow: 0 0 0 12px rgba(233, 69, 96, 0);
           }
+        }
+
+        .vad-indicator {
+          position: relative;
+          width: 80px;
+          height: 80px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .vad-rings {
+          position: absolute;
+          inset: 0;
+        }
+
+        .ring {
+          position: absolute;
+          inset: 0;
+          border: 2px solid #0f3460;
+          border-radius: 50%;
+          opacity: 0.3;
+        }
+
+        .vad-indicator.listening .ring {
+          border-color: #4ecca3;
+          animation: vad-pulse 2s ease-in-out infinite;
+        }
+
+        .vad-indicator.recording .ring {
+          border-color: #e94560;
+          animation: vad-pulse 1s ease-in-out infinite;
+        }
+
+        .ring-1 { animation-delay: 0s; }
+        .ring-2 { animation-delay: 0.3s; }
+        .ring-3 { animation-delay: 0.6s; }
+
+        @keyframes vad-pulse {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 0.3;
+          }
+          50% {
+            transform: scale(1.15);
+            opacity: 0.6;
+          }
+        }
+
+        .vad-indicator .mic-icon {
+          position: relative;
+          z-index: 1;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: #1a1a2e;
+          border: 2px solid #0f3460;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #888;
+          transition: all 0.3s;
+        }
+
+        .vad-indicator.listening .mic-icon {
+          border-color: #4ecca3;
+          color: #4ecca3;
+        }
+
+        .vad-indicator.recording .mic-icon {
+          border-color: #e94560;
+          background: #e94560;
+          color: white;
+        }
+
+        .vad-indicator .mic-icon svg {
+          width: 20px;
+          height: 20px;
         }
       `}</style>
     </div>
