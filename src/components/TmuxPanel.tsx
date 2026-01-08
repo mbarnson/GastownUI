@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
+  Monitor,
 } from 'lucide-react'
 import {
   useTmuxSessions,
@@ -19,6 +20,7 @@ import {
 import { TerminalPreview } from './TerminalPreview'
 import type { SessionHealth, TmuxSession } from '../types/tmux'
 import { focusRingClasses } from '../lib/a11y'
+import { isTauriEnvironment } from '../lib/setupDetector'
 
 const healthColors: Record<SessionHealth, { dot: string; text: string; label: string; tooltip: string }> = {
   active: { dot: 'text-green-400', text: 'text-green-400', label: 'Active', tooltip: 'Session is actively responding' },
@@ -182,8 +184,38 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
 }
 
 export default function TmuxPanel() {
+  // Check if running in Tauri (desktop app) vs browser
+  const isTauri = typeof window !== 'undefined' && isTauriEnvironment()
+
   const { data: sessions, isLoading, error, refetch } = useTmuxSessions()
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
+
+  // Show browser fallback if not in Tauri environment
+  if (!isTauri) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Terminal className="w-6 h-6 text-cyan-400" aria-hidden="true" />
+          <h2 className="text-xl font-bold text-white">TMUX SESSIONS</h2>
+        </div>
+        <div
+          className="bg-slate-800/50 border border-slate-700 rounded-xl p-8 text-center"
+          role="status"
+          aria-live="polite"
+        >
+          <Monitor className="w-12 h-12 text-slate-500 mx-auto mb-4" aria-hidden="true" />
+          <h3 className="text-lg font-medium text-white mb-2">Desktop App Required</h3>
+          <p className="text-slate-400 mb-4">
+            This feature requires the GAS TOWN desktop app to access tmux sessions.
+          </p>
+          <p className="text-sm text-slate-500">
+            Download the desktop app for full functionality including terminal access,
+            session management, and live pane previews.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const toggleSession = (name: string) => {
     setExpandedSessions((prev) => {
