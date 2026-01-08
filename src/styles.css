@@ -517,3 +517,32 @@ textarea:focus-visible {
     forced-color-adjust: none;
   }
 }
+
+/* FTUE Confetti Animation */
+@keyframes confetti {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.animate-confetti {
+  animation: confetti 3s ease-out forwards;
+}
+
+/* Respect reduced motion for confetti */
+@media (prefers-reduced-motion: reduce) {
+  .animate-confetti {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.calm-mode .animate-confetti {
+  animation: none;
+  opacity: 0;
+}
