@@ -1,0 +1,31 @@
+Gas Town UI - Your AI Agent Command Center
+
+Control your fleet of autonomous coding agents with voice commands and a beautiful dashboard. Gas Town UI brings enterprise-grade AI orchestration to your pocket.
+
+VOICE-FIRST CONTROL
+- Push-to-talk voice commands for hands-free agent management
+- Natural language queries: "Why is the convoy stuck?" "Which polecats are idle?"
+- Multiple voice personas: Mayor, Witness, Refinery, and more
+- Local AI processing with LFM2.5 - your data stays on device
+
+REAL-TIME MONITORING
+- Track active convoys and work progress
+- Monitor polecat (worker) status across all rigs
+- View blocked issues and dependencies
+- Activity feed with cost tracking
+
+DEEP QUERY ANALYSIS
+- Ask natural language questions about your agent fleet
+- Get AI-powered insights without cloud dependencies
+- Understand blockers, progress, and optimization opportunities
+
+BUILT FOR DEVELOPERS
+- Seamless integration with Git workflows
+- Beads issue tracking at your fingertips
+- tmux session management
+- Cross-platform sync with desktop app
+
+Gas Town UI is built on Tauri 2.0 for native performance and security. Your agent orchestration data never leaves your device.
+
+Privacy Policy: https://gastown.dev/privacy
+Terms of Service: https://gastown.dev/terms

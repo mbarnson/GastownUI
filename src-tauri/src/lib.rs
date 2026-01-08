@@ -1,10 +1,11 @@
 mod gastown;
-mod setup;
-mod vision;
 mod voice;
+mod self_test;
+mod instruct;
 
-use vision::VisionServerState;
 use voice::VoiceServerState;
+use self_test::SelfTestState;
+use instruct::InstructState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -13,7 +14,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .manage(VoiceServerState::default())
-        .manage(VisionServerState::default())
+        .manage(SelfTestState::default())
+        .manage(InstructState::default())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -28,26 +30,21 @@ pub fn run() {
             gastown::run_gt_command,
             gastown::read_beads_file,
             gastown::list_tmux_sessions,
-            gastown::get_tmux_panes,
-            gastown::capture_tmux_pane,
-            gastown::get_session_details,
-            gastown::attach_tmux_session,
             voice::start_voice_server,
             voice::stop_voice_server,
             voice::get_voice_server_status,
             voice::send_voice_input,
             voice::send_text_to_speech,
             voice::transcribe_audio,
-            vision::capture_screenshot,
-            vision::start_vision_server,
-            vision::stop_vision_server,
-            vision::get_vision_server_status,
-            vision::describe_screen,
-            vision::describe_image,
-            setup::check_dependencies,
-            setup::install_dependency,
-            setup::create_workspace,
-            setup::get_setup_status,
+            voice::get_voice_personas,
+            self_test::get_self_test_status,
+            self_test::get_test_cases,
+            self_test::start_self_test,
+            self_test::stop_self_test,
+            self_test::add_test_case,
+            instruct::get_instruct_status,
+            instruct::set_instruct_model,
+            instruct::query_deep,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

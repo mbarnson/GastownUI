@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
 import { SelfTestPanel } from '../components/SelfTestPanel'
 import { TmuxPanel } from '../components/TmuxPanel'
+import { DeepQueryPanel } from '../components/DeepQueryPanel'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import {
   Truck,
@@ -11,12 +12,15 @@ import {
   Activity,
   AlertTriangle,
   TestTube2,
+  Brain,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
 
+type SidebarMode = 'voice' | 'selfTest' | 'deepQuery'
+
 function Dashboard() {
-  const [showSelfTest, setShowSelfTest] = useState(false)
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('voice')
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
@@ -46,11 +50,23 @@ function Dashboard() {
             </div>
             <button
               className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
-                showSelfTest
+                sidebarMode === 'deepQuery'
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'hover:bg-slate-700'
+              }`}
+              onClick={() => setSidebarMode(sidebarMode === 'deepQuery' ? 'voice' : 'deepQuery')}
+              title="Deep Query - AI Analysis"
+            >
+              <Brain className="w-4 h-4" />
+              <span>Query</span>
+            </button>
+            <button
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                sidebarMode === 'selfTest'
                   ? 'bg-amber-500/20 text-amber-400'
                   : 'hover:bg-slate-700'
               }`}
-              onClick={() => setShowSelfTest(!showSelfTest)}
+              onClick={() => setSidebarMode(sidebarMode === 'selfTest' ? 'voice' : 'selfTest')}
               title="Voice Self-Test"
             >
               <TestTube2 className="w-4 h-4" />
@@ -147,11 +163,15 @@ function Dashboard() {
             <TmuxPanel />
           </div>
 
-          {/* Voice Interface / Self-Test sidebar */}
+          {/* Voice Interface / Self-Test / Deep Query sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-6 space-y-6">
-              {showSelfTest ? (
+              {sidebarMode === 'selfTest' ? (
                 <SelfTestPanel />
+              ) : sidebarMode === 'deepQuery' ? (
+                <div className="h-[calc(100vh-8rem)]">
+                  <DeepQueryPanel />
+                </div>
               ) : (
                 <div className="h-[calc(100vh-8rem)]">
                   <VoiceInterface />
