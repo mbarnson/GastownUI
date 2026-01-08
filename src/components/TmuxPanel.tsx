@@ -1,218 +1,259 @@
-import { Terminal, Monitor, Copy, ExternalLink, AlertCircle } from 'lucide-react'
-import { useTmuxSessions, isTauri } from '../hooks/useGastown'
-import type { TmuxSession } from '../types/gastown'
+import { useState, useEffect } from 'react'
+import {
+  Terminal,
+  Copy,
+  Check,
+  ExternalLink,
+  Circle,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react'
+import {
+  useTmuxSessions,
+  useTmuxSessionDetail,
+  useTmuxPaneContent,
+  useAttachTmuxSession,
+  useCopyConnectionString,
+} from '../hooks/useTmux'
+import { TerminalPreview } from './TerminalPreview'
+import type { SessionHealth, TmuxSession } from '../types/tmux'
 
-interface TmuxPanelProps {
-  compact?: boolean
+const healthColors: Record<SessionHealth, { dot: string; text: string; label: string; tooltip: string }> = {
+  active: { dot: 'text-green-400', text: 'text-green-400', label: 'Active', tooltip: 'Session is actively responding' },
+  processing: { dot: 'text-yellow-400', text: 'text-yellow-400', label: 'Processing', tooltip: 'Running a command or task' },
+  idle: { dot: 'text-slate-400', text: 'text-slate-400', label: 'Idle', tooltip: 'Session is idle at shell prompt' },
+  stuck: { dot: 'text-red-400 animate-pulse', text: 'text-red-400', label: 'Stuck', tooltip: 'Session may be stuck - no recent activity' },
 }
 
-export default function TmuxPanel({ compact = false }: TmuxPanelProps) {
-  // Check if we're in Tauri context
-  const inTauri = isTauri()
+interface SessionCardProps {
+  session: TmuxSession
+  isExpanded: boolean
+  onToggle: () => void
+}
 
-  // Only fetch sessions if in Tauri
-  const { data: sessions, isLoading, error } = useTmuxSessions()
+function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
+  const { data: details, isLoading } = useTmuxSessionDetail(
+    isExpanded ? session.name : null
+  )
+  const { data: paneContent } = useTmuxPaneContent(
+    isExpanded && details?.panes[0]?.pane_id
+      ? details.panes[0].pane_id
+      : null
+  )
+  const attachMutation = useAttachTmuxSession()
+  const copyMutation = useCopyConnectionString()
+  const [copySuccess, setCopySuccess] = useState(false)
 
-  // Browser fallback - show friendly message instead of cryptic errors
-  if (!inTauri) {
-    return <BrowserFallback compact={compact} />
+  // Reset copy success after 2 seconds
+  useEffect(() => {
+    if (copySuccess) {
+      const timer = setTimeout(() => setCopySuccess(false), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [copySuccess])
+
+  const health = details?.health ?? 'idle'
+  const colors = healthColors[health]
+  const connectionString = details?.connection_string ?? `tmux attach -t ${session.name}`
+
+  const handleAttach = () => {
+    attachMutation.mutate(session.name)
   }
 
-  if (isLoading) {
-    return <LoadingState compact={compact} />
+  const handleCopy = () => {
+    copyMutation.mutate(connectionString, {
+      onSuccess: () => setCopySuccess(true),
+    })
+  }
+
+  return (
+    <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden hover:border-cyan-500/50 transition-all">
+      {/* Session Header */}
+      <button
+        onClick={onToggle}
+        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-700/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+          )}
+          <Terminal className="w-5 h-5 text-cyan-400" />
+          <span className="font-medium text-white">{session.name}</span>
+          {session.attached && (
+            <span className="text-xs px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded">
+              attached
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2" title={colors.tooltip}>
+          <Circle className={`w-3 h-3 fill-current ${colors.dot}`} />
+          <span className={`text-sm ${colors.text}`}>{colors.label}</span>
+        </div>
+      </button>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="border-t border-slate-700">
+          {/* Terminal Preview */}
+          <div className="p-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32 text-slate-400">
+                <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                Loading...
+              </div>
+            ) : paneContent ? (
+              <TerminalPreview
+                content={paneContent}
+                className="h-48 border border-slate-600"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-32 text-slate-500 bg-slate-900/50 rounded-lg">
+                No pane content available
+              </div>
+            )}
+          </div>
+
+          {/* Pane Info */}
+          {details?.panes && details.panes.length > 0 && (
+            <div className="px-4 pb-3">
+              <div className="text-xs text-slate-400 mb-2">
+                {details.panes.length} pane{details.panes.length !== 1 ? 's' : ''} •{' '}
+                Running: {details.panes[0].pane_current_command}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="px-4 pb-4 flex gap-2">
+            <button
+              onClick={handleAttach}
+              disabled={attachMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              {attachMutation.isPending ? 'Opening...' : 'Attach'}
+            </button>
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                copySuccess
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+              }`}
+              title="Copy connection string to clipboard"
+            >
+              {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copySuccess ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+
+          {/* Connection String */}
+          <div className="px-4 pb-4">
+            <code className="block w-full px-3 py-2 bg-slate-900 rounded text-xs text-slate-400 font-mono overflow-x-auto">
+              {connectionString}
+            </code>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function TmuxPanel() {
+  const { data: sessions, isLoading, error, refetch } = useTmuxSessions()
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
+
+  const toggleSession = (name: string) => {
+    setExpandedSessions((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) {
+        next.delete(name)
+      } else {
+        next.add(name)
+      }
+      return next
+    })
   }
 
   if (error) {
-    return <ErrorState error={error} compact={compact} />
+    return (
+      <div className="p-6">
+        <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 text-red-400">
+          <p className="font-medium">Failed to load tmux sessions</p>
+          <p className="text-sm mt-1 text-red-400/80">
+            {error instanceof Error ? error.message : 'Unknown error'}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="mt-3 px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded text-sm transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
-  const activeSessions = sessions || []
-
   return (
-    <div
-      className={`bg-slate-800/50 border border-slate-700 rounded-xl ${compact ? 'p-4' : 'p-6'}`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h2
-          className={`font-semibold text-white flex items-center gap-2 ${compact ? 'text-base' : 'text-lg'}`}
-        >
-          <Terminal className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
-          Tmux Sessions
-        </h2>
-        <span className="text-xs text-slate-500 font-mono">
-          Cmd+T to jump
-        </span>
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Terminal className="w-6 h-6 text-cyan-400" />
+          <h2 className="text-xl font-bold text-white">TMUX SESSIONS</h2>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">Cmd+T</kbd>
+          <span>to jump</span>
+        </div>
       </div>
 
-      {activeSessions.length === 0 ? (
-        <EmptyState />
+      {/* Sessions List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12 text-slate-400">
+          <RefreshCw className="w-6 h-6 animate-spin mr-3" />
+          Loading sessions...
+        </div>
+      ) : sessions?.length === 0 ? (
+        <div className="text-center py-12">
+          <Terminal className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+          <p className="text-slate-400 mb-2">No tmux sessions running</p>
+          <p className="text-sm text-slate-500">
+            Start a tmux session to see it here
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {activeSessions.map((session) => (
-            <SessionCard key={session.name} session={session} compact={compact} />
+          {sessions?.map((session) => (
+            <SessionCard
+              key={session.name}
+              session={session}
+              isExpanded={expandedSessions.has(session.name)}
+              onToggle={() => toggleSession(session.name)}
+            />
           ))}
         </div>
       )}
-    </div>
-  )
-}
 
-// Browser fallback component
-function BrowserFallback({ compact }: { compact: boolean }) {
-  return (
-    <div
-      className={`bg-slate-800/50 border border-amber-500/30 rounded-xl ${compact ? 'p-4' : 'p-6'}`}
-    >
-      <div className="flex items-center gap-3 mb-3">
-        <div className="p-2 bg-amber-900/30 rounded-lg">
-          <Monitor className="w-5 h-5 text-amber-400" />
-        </div>
-        <h2 className="font-semibold text-white">Tmux Sessions</h2>
-      </div>
-
-      <div className="flex items-start gap-3 p-4 bg-slate-900/50 rounded-lg border border-slate-700">
-        <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-amber-200 font-medium mb-1">
-            This feature requires the desktop app
-          </p>
-          <p className="text-slate-400 text-sm">
-            Tmux session management is only available when running GastownUI as
-            a native desktop application via Tauri.
-          </p>
-          <p className="text-slate-500 text-xs mt-2">
-            Run{' '}
-            <code className="px-1.5 py-0.5 bg-slate-800 rounded text-cyan-400">
-              npm run tauri:dev
-            </code>{' '}
-            for full functionality.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Session card component
-function SessionCard({
-  session,
-  compact,
-}: {
-  session: TmuxSession
-  compact: boolean
-}) {
-  const attachCmd = `tmux attach -t ${session.name}`
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(attachCmd)
-  }
-
-  return (
-    <div className="bg-slate-900/50 border border-slate-600 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              session.attached ? 'bg-green-500' : 'bg-slate-500'
-            }`}
-          />
-          <span className="text-white font-medium font-mono text-sm">
-            {session.name}
+      {/* Footer Stats */}
+      {sessions && sessions.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-slate-700 flex items-center justify-between text-sm text-slate-400">
+          <span>
+            {sessions.length} session{sessions.length !== 1 ? 's' : ''} •{' '}
+            {sessions.filter((s) => s.attached).length} attached
           </span>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
         </div>
-        <span
-          className={`text-xs px-2 py-0.5 rounded ${
-            session.attached
-              ? 'bg-green-900/50 text-green-400'
-              : 'bg-slate-700 text-slate-400'
-          }`}
-        >
-          {session.attached ? 'Attached' : 'Detached'}
-        </span>
-      </div>
-
-      {!compact && (
-        <>
-          {/* Session preview placeholder */}
-          <div className="bg-black/50 rounded border border-slate-700 p-3 mb-3 font-mono text-xs text-slate-400">
-            <div className="flex items-center gap-2 text-green-400">
-              <span>$</span>
-              <span className="animate-pulse">_</span>
-            </div>
-            <p className="text-slate-500 mt-1">
-              {session.windows} window{session.windows !== 1 ? 's' : ''}
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded transition-colors"
-              title="Attach to session"
-            >
-              <ExternalLink className="w-3 h-3" />
-              Attach
-            </button>
-            <button
-              onClick={copyToClipboard}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded transition-colors"
-              title={attachCmd}
-            >
-              <Copy className="w-3 h-3" />
-              Copy
-            </button>
-          </div>
-        </>
       )}
-    </div>
-  )
-}
-
-// Loading state
-function LoadingState({ compact }: { compact: boolean }) {
-  return (
-    <div
-      className={`bg-slate-800/50 border border-slate-700 rounded-xl ${compact ? 'p-4' : 'p-6'}`}
-    >
-      <div className="animate-pulse space-y-4">
-        <div className="h-6 bg-slate-700 rounded w-1/3" />
-        <div className="h-20 bg-slate-700 rounded" />
-        <div className="h-20 bg-slate-700 rounded" />
-      </div>
-    </div>
-  )
-}
-
-// Empty state
-function EmptyState() {
-  return (
-    <div className="text-center py-8">
-      <Terminal className="w-12 h-12 mx-auto mb-2 text-slate-600" />
-      <p className="text-slate-500">No tmux sessions found</p>
-      <p className="text-slate-600 text-sm mt-1">
-        Start a session with <code className="text-cyan-400">tmux new</code>
-      </p>
-    </div>
-  )
-}
-
-// Error state
-function ErrorState({
-  error,
-  compact,
-}: {
-  error: Error
-  compact: boolean
-}) {
-  return (
-    <div
-      className={`bg-slate-800/50 border border-red-500/30 rounded-xl ${compact ? 'p-4' : 'p-6'}`}
-    >
-      <div className="flex items-center gap-2 text-red-400 mb-2">
-        <AlertCircle className="w-5 h-5" />
-        <span className="font-medium">Error loading sessions</span>
-      </div>
-      <p className="text-slate-400 text-sm">{error.message}</p>
     </div>
   )
 }
