@@ -6,6 +6,7 @@ import {
   getCurrentSetupScene,
   SetupScene,
 } from '../hooks/useSetup';
+import { useSetupPreferences } from '../hooks/useSetupPreferences';
 import {
   CheckCircle,
   XCircle,
@@ -14,6 +15,8 @@ import {
   Copy,
   ExternalLink,
   RefreshCw,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 interface SetupWizardProps {
@@ -22,15 +25,26 @@ interface SetupWizardProps {
 
 export function SetupWizard({ onComplete }: SetupWizardProps) {
   const { data: status, isLoading, refetch } = useSetupStatus();
+  const { preferences, isLoaded, disableVoice, enableVoice, setLastStep } = useSetupPreferences();
   const scene = getCurrentSetupScene(status, isLoading);
+
+  // Track current step for resume capability
+  useEffect(() => {
+    if (scene !== 'loading' && scene !== 'complete') {
+      setLastStep(scene);
+    }
+  }, [scene, setLastStep]);
 
   // Auto-advance when setup is complete
   useEffect(() => {
     if (scene === 'complete') {
+      setLastStep(null);
       const timer = setTimeout(onComplete, 1500);
       return () => clearTimeout(timer);
     }
-  }, [scene, onComplete]);
+  }, [scene, onComplete, setLastStep]);
+
+  const voiceEnabled = preferences.voiceEnabled;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
@@ -42,6 +56,31 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             <span className="text-rose-500">TOWN</span>
           </h1>
           <p className="text-gray-400">First-Time Setup</p>
+
+          {/* Voice mode toggle */}
+          {isLoaded && scene !== 'complete' && (
+            <button
+              onClick={voiceEnabled ? disableVoice : enableVoice}
+              className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                voiceEnabled
+                  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                  : 'bg-slate-700 text-gray-400 hover:bg-slate-600'
+              }`}
+              title={voiceEnabled ? 'Voice guidance enabled' : 'Text-only mode'}
+            >
+              {voiceEnabled ? (
+                <>
+                  <Volume2 className="w-3.5 h-3.5" />
+                  Voice Enabled
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-3.5 h-3.5" />
+                  Text Only
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Progress indicator */}
@@ -62,8 +101,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         {/* Scene content */}
         <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
           {scene === 'loading' && <LoadingScene />}
-          {scene === 'go-install' && <GoInstallScene onRefresh={refetch} />}
-          {scene === 'beads-install' && <BeadsInstallScene onRefresh={refetch} />}
+          {scene === 'go-install' && <GoInstallScene onRefresh={refetch} voiceEnabled={voiceEnabled} />}
+          {scene === 'beads-install' && <BeadsInstallScene onRefresh={refetch} voiceEnabled={voiceEnabled} />}
           {scene === 'complete' && <CompleteScene />}
         </div>
       </div>
@@ -121,7 +160,7 @@ function LoadingScene() {
   );
 }
 
-function GoInstallScene({ onRefresh }: { onRefresh: () => void }) {
+function GoInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void; voiceEnabled: boolean }) {
   const { data: instructions, isLoading } = useGoInstructions();
   const { data: status } = useSetupStatus();
   const [copied, setCopied] = useState(false);
@@ -148,6 +187,23 @@ function GoInstallScene({ onRefresh }: { onRefresh: () => void }) {
           </p>
         </div>
       </div>
+
+      {/* Non-voice mode: Expanded step-by-step instructions */}
+      {!voiceEnabled && (
+        <div className="p-4 bg-slate-900/70 rounded-lg border border-slate-600 space-y-3">
+          <h3 className="text-sm font-medium text-white flex items-center gap-2">
+            <VolumeX className="w-4 h-4 text-gray-400" />
+            Step-by-Step Instructions
+          </h3>
+          <ol className="text-sm text-gray-300 space-y-2 list-decimal list-inside">
+            <li>Open your terminal application</li>
+            <li>Copy the installation command below</li>
+            <li>Paste and run the command in your terminal</li>
+            <li>Wait for the installation to complete</li>
+            <li>Click "Check Again" when done</li>
+          </ol>
+        </div>
+      )}
 
       {/* Platform info */}
       {status?.platform && (
@@ -221,7 +277,7 @@ function GoInstallScene({ onRefresh }: { onRefresh: () => void }) {
   );
 }
 
-function BeadsInstallScene({ onRefresh }: { onRefresh: () => void }) {
+function BeadsInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void; voiceEnabled: boolean }) {
   const { data: instructions, isLoading } = useBeadsInstructions();
   const { data: status } = useSetupStatus();
   const [copied, setCopied] = useState(false);
@@ -253,6 +309,23 @@ function BeadsInstallScene({ onRefresh }: { onRefresh: () => void }) {
         <div className="flex items-center gap-2 text-sm text-emerald-400">
           <CheckCircle className="w-4 h-4" />
           <span>Go {status.go.version} detected at {status.go.path}</span>
+        </div>
+      )}
+
+      {/* Non-voice mode: Expanded step-by-step instructions */}
+      {!voiceEnabled && (
+        <div className="p-4 bg-slate-900/70 rounded-lg border border-slate-600 space-y-3">
+          <h3 className="text-sm font-medium text-white flex items-center gap-2">
+            <VolumeX className="w-4 h-4 text-gray-400" />
+            Step-by-Step Instructions
+          </h3>
+          <ol className="text-sm text-gray-300 space-y-2 list-decimal list-inside">
+            <li>Open your terminal application</li>
+            <li>Copy the go install command below</li>
+            <li>Paste and run the command in your terminal</li>
+            <li>Ensure <code className="bg-slate-800 px-1 rounded">$(go env GOPATH)/bin</code> is in your PATH</li>
+            <li>Click "Check Again" when done</li>
+          </ol>
         </div>
       )}
 
