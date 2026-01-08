@@ -436,3 +436,124 @@ export function useUpdateBead() {
     },
   })
 }
+
+// ============== Vision Integration ==============
+
+export interface VisionServerStatus {
+  running: boolean
+  ready: boolean
+  url: string
+}
+
+export interface VisionResponse {
+  description: string
+  latency_ms: number
+}
+
+export interface ScreenshotResult {
+  image_base64: string
+  width: number
+  height: number
+}
+
+// Check vision server status
+export function useVisionServerStatus() {
+  return useQuery({
+    queryKey: ['visionServerStatus'],
+    queryFn: async (): Promise<VisionServerStatus> => {
+      if (!isTauri()) {
+        return { running: false, ready: false, url: 'http://127.0.0.1:8081' }
+      }
+      return invoke<VisionServerStatus>('get_vision_server_status')
+    },
+    refetchInterval: 5000,
+    staleTime: 2000,
+    enabled: isBrowser,
+  })
+}
+
+// Start vision server (on demand)
+export function useStartVisionServer() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (): Promise<VisionServerStatus> => {
+      if (!isTauri()) {
+        return { running: true, ready: true, url: 'http://127.0.0.1:8081' }
+      }
+      return invoke<VisionServerStatus>('start_vision_server', { config: null })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['visionServerStatus'] })
+    },
+  })
+}
+
+// Stop vision server
+export function useStopVisionServer() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (): Promise<void> => {
+      if (!isTauri()) {
+        return
+      }
+      return invoke<void>('stop_vision_server')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['visionServerStatus'] })
+    },
+  })
+}
+
+// Capture screenshot only (without analysis)
+export function useCaptureScreenshot() {
+  return useMutation({
+    mutationFn: async (): Promise<ScreenshotResult> => {
+      if (!isTauri()) {
+        // Mock screenshot in dev
+        return {
+          image_base64: 'mock_base64_data',
+          width: 1920,
+          height: 1080,
+        }
+      }
+      return invoke<ScreenshotResult>('capture_screenshot')
+    },
+  })
+}
+
+// Describe screen - captures screenshot and analyzes it
+// This is the main "what am I looking at?" function
+export function useDescribeScreen() {
+  return useMutation({
+    mutationFn: async (customPrompt?: string): Promise<VisionResponse> => {
+      if (!isTauri()) {
+        // Mock response in dev
+        return {
+          description: 'Mock: You are looking at the GastownUI dashboard. It shows 2 active convoys, 3 polecats (2 active, 1 idle), and 5 open beads. The merge queue has 2 items pending.',
+          latency_ms: 1500,
+        }
+      }
+      return invoke<VisionResponse>('describe_screen', { customPrompt: customPrompt || null })
+    },
+  })
+}
+
+// Describe an arbitrary image
+export function useDescribeImage() {
+  return useMutation({
+    mutationFn: async ({ imageBase64, prompt }: { imageBase64: string; prompt?: string }): Promise<VisionResponse> => {
+      if (!isTauri()) {
+        return {
+          description: 'Mock: Image description not available in dev mode.',
+          latency_ms: 1000,
+        }
+      }
+      return invoke<VisionResponse>('describe_image', {
+        imageBase64,
+        prompt: prompt || null,
+      })
+    },
+  })
+}
