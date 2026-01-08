@@ -10,6 +10,8 @@ import {
   ExternalLink,
   Flame,
   ChevronRight,
+  Edit3,
+  FolderOpen,
 } from 'lucide-react'
 import {
   useSetupStatus,
@@ -28,6 +30,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const createWorkspace = useCreateWorkspace()
   const [voiceResponse, setVoiceResponse] = useState<string | null>(null)
   const [activeInstall, setActiveInstall] = useState<string | null>(null)
+  const [workspacePath, setWorkspacePath] = useState<string>('~/gt')
+  const [showPathInput, setShowPathInput] = useState(false)
 
   if (isLoading) {
     return (
@@ -93,14 +97,23 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const handleCreateWorkspace = async () => {
     setActiveInstall('workspace')
     try {
-      const result = await createWorkspace.mutateAsync()
+      // Expand ~ to home directory path (backend handles this)
+      const path = workspacePath.startsWith('~/')
+        ? workspacePath
+        : workspacePath || undefined
+      const result = await createWorkspace.mutateAsync(path)
       setVoiceResponse(result.voice_response)
+      setShowPathInput(false)
       setTimeout(() => refetch(), 1000)
     } catch (error) {
       setVoiceResponse(`Workspace creation failed: ${error}`)
     } finally {
       setActiveInstall(null)
     }
+  }
+
+  const handlePathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setWorkspacePath(e.target.value)
   }
 
   return (
@@ -180,30 +193,74 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-500/20 rounded-lg">
-                  <Folder className="w-5 h-5 text-yellow-400" />
-                </div>
-                <div>
-                  <div className="text-white font-medium">No Workspace</div>
-                  <div className="text-sm text-gray-400">
-                    Create a Gas Town workspace to get started
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-yellow-500/20 rounded-lg">
+                    <FolderOpen className="w-5 h-5 text-yellow-400" />
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">No Workspace</div>
+                    <div className="text-sm text-gray-400">
+                      Create a Gas Town workspace to get started
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={() => setShowPathInput(!showPathInput)}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                  title="Change path"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={handleCreateWorkspace}
-                disabled={status.missing_count > 0 || activeInstall !== null}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-              >
-                {activeInstall === 'workspace' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-                Create Workspace
-              </button>
+
+              {/* Path Selection */}
+              {showPathInput && (
+                <div className="bg-slate-900/50 rounded-lg p-3 space-y-3">
+                  <label className="block text-sm text-gray-400">
+                    Workspace Location
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Folder className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type="text"
+                        value={workspacePath}
+                        onChange={handlePathChange}
+                        placeholder="~/gt"
+                        className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    This directory will be created if it doesn't exist. Use ~ for home directory.
+                  </p>
+                </div>
+              )}
+
+              {/* Create Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={handleCreateWorkspace}
+                  disabled={status.missing_count > 0 || activeInstall !== null}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                >
+                  {activeInstall === 'workspace' ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                  Create at {workspacePath}
+                </button>
+              </div>
+
+              {/* Missing Dependencies Warning */}
+              {status.missing_count > 0 && (
+                <p className="text-sm text-yellow-400">
+                  Install all dependencies before creating workspace
+                </p>
+              )}
             </div>
           )}
         </div>
