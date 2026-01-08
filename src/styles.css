@@ -1,6 +1,53 @@
 @import "tailwindcss";
 
 /* ============================================
+   Theme Support (Light/Dark Mode)
+   Uses class-based switching with system detection
+   ============================================ */
+
+/* Light theme (default) */
+:root,
+.light {
+  color-scheme: light;
+  --theme-bg-primary: theme('colors.white');
+  --theme-bg-secondary: theme('colors.slate.50');
+  --theme-bg-tertiary: theme('colors.slate.100');
+  --theme-text-primary: theme('colors.slate.900');
+  --theme-text-secondary: theme('colors.slate.600');
+  --theme-text-tertiary: theme('colors.slate.400');
+  --theme-border: theme('colors.slate.200');
+  --theme-border-hover: theme('colors.slate.300');
+}
+
+/* Dark theme */
+.dark {
+  color-scheme: dark;
+  --theme-bg-primary: theme('colors.slate.900');
+  --theme-bg-secondary: theme('colors.slate.800');
+  --theme-bg-tertiary: theme('colors.slate.700');
+  --theme-text-primary: theme('colors.slate.100');
+  --theme-text-secondary: theme('colors.slate.300');
+  --theme-text-tertiary: theme('colors.slate.500');
+  --theme-border: theme('colors.slate.700');
+  --theme-border-hover: theme('colors.slate.600');
+}
+
+/* Auto-detect system preference when no class is set */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    color-scheme: dark;
+    --theme-bg-primary: theme('colors.slate.900');
+    --theme-bg-secondary: theme('colors.slate.800');
+    --theme-bg-tertiary: theme('colors.slate.700');
+    --theme-text-primary: theme('colors.slate.100');
+    --theme-text-secondary: theme('colors.slate.300');
+    --theme-text-tertiary: theme('colors.slate.500');
+    --theme-border: theme('colors.slate.700');
+    --theme-border-hover: theme('colors.slate.600');
+  }
+}
+
+/* ============================================
    Dynamic Type / Accessibility Support
    Respects system font size preferences
    ============================================ */
@@ -123,17 +170,22 @@ code {
   top: 100%;
   z-index: 50;
   padding: 0.5rem 0.75rem;
-  background: theme('colors.slate.800');
-  border: 1px solid theme('colors.slate.700');
+  background: var(--theme-bg-tertiary);
+  color: var(--theme-text-primary);
+  border: 1px solid var(--theme-border);
   border-radius: 0.375rem;
   font-size: var(--dt-sm);
   white-space: normal;
   max-width: 20rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.15s ease-out, visibility 0.15s ease-out;
   pointer-events: none;
+}
+
+.dark .truncate-tooltip::after {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
 .truncate-tooltip:hover::after,
