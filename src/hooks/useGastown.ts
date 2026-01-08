@@ -17,7 +17,7 @@ async function runCommand(cmd: string, args: string[]): Promise<CommandResult> {
 }
 
 // Check if running in Tauri context
-function isTauri(): boolean {
+export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window
 }
 

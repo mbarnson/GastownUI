@@ -19,6 +19,7 @@ import {
   useActivityFeed,
   useBeads,
 } from '../hooks/useGastown'
+import TmuxPanel from '../components/TmuxPanel'
 import type { Convoy, ActivityItem, Bead, TownStatus as TownStatusType } from '../types/gastown'
 
 export const Route = createFileRoute('/dashboard')({ component: Dashboard })
@@ -69,6 +70,7 @@ function DashboardContent() {
         <div className="lg:col-span-2 space-y-6">
           <TownStatusPanel status={townStatus} loading={townLoading} />
           <ConvoyDashboard convoys={convoys || []} loading={convoysLoading} />
+          <TmuxPanel />
         </div>
 
         {/* Right Column: Activity Feed */}
