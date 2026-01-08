@@ -9,12 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TmuxRouteImport } from './routes/tmux'
-import { Route as MoleculesRouteImport } from './routes/molecules'
+import { Route as VisionosRouteImport } from './routes/visionos'
+import { Route as MobileRouteImport } from './routes/mobile'
 import { Route as DesignRouteImport } from './routes/design'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as RigRigIdRouteImport } from './routes/rig/$rigId'
+import { Route as WelcomeCompleteRouteImport } from './routes/welcome/complete'
+import { Route as RigRigIdRouteImport } from './routes/rig.$rigId'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
 import { Route as DemoApiNamesRouteImport } from './routes/demo/api.names'
@@ -23,14 +24,14 @@ import { Route as DemoStartSsrSpaModeRouteImport } from './routes/demo/start.ssr
 import { Route as DemoStartSsrFullSsrRouteImport } from './routes/demo/start.ssr.full-ssr'
 import { Route as DemoStartSsrDataOnlyRouteImport } from './routes/demo/start.ssr.data-only'
 
-const TmuxRoute = TmuxRouteImport.update({
-  id: '/tmux',
-  path: '/tmux',
+const VisionosRoute = VisionosRouteImport.update({
+  id: '/visionos',
+  path: '/visionos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MoleculesRoute = MoleculesRouteImport.update({
-  id: '/molecules',
-  path: '/molecules',
+const MobileRoute = MobileRouteImport.update({
+  id: '/mobile',
+  path: '/mobile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignRoute = DesignRouteImport.update({
@@ -46,6 +47,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeCompleteRoute = WelcomeCompleteRouteImport.update({
+  id: '/welcome/complete',
+  path: '/welcome/complete',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RigRigIdRoute = RigRigIdRouteImport.update({
@@ -93,9 +99,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
-  '/molecules': typeof MoleculesRoute
-  '/tmux': typeof TmuxRoute
+  '/mobile': typeof MobileRoute
+  '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
+  '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -108,9 +115,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
-  '/molecules': typeof MoleculesRoute
-  '/tmux': typeof TmuxRoute
+  '/mobile': typeof MobileRoute
+  '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
+  '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -124,9 +132,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
-  '/molecules': typeof MoleculesRoute
-  '/tmux': typeof TmuxRoute
+  '/mobile': typeof MobileRoute
+  '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
+  '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -141,9 +150,10 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/design'
-    | '/molecules'
-    | '/tmux'
+    | '/mobile'
+    | '/visionos'
     | '/rig/$rigId'
+    | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -156,9 +166,10 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/design'
-    | '/molecules'
-    | '/tmux'
+    | '/mobile'
+    | '/visionos'
     | '/rig/$rigId'
+    | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -171,9 +182,10 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/design'
-    | '/molecules'
-    | '/tmux'
+    | '/mobile'
+    | '/visionos'
     | '/rig/$rigId'
+    | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -187,9 +199,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   DesignRoute: typeof DesignRoute
-  MoleculesRoute: typeof MoleculesRoute
-  TmuxRoute: typeof TmuxRoute
+  MobileRoute: typeof MobileRoute
+  VisionosRoute: typeof VisionosRoute
   RigRigIdRoute: typeof RigRigIdRoute
+  WelcomeCompleteRoute: typeof WelcomeCompleteRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
   DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
@@ -201,18 +214,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/tmux': {
-      id: '/tmux'
-      path: '/tmux'
-      fullPath: '/tmux'
-      preLoaderRoute: typeof TmuxRouteImport
+    '/visionos': {
+      id: '/visionos'
+      path: '/visionos'
+      fullPath: '/visionos'
+      preLoaderRoute: typeof VisionosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/molecules': {
-      id: '/molecules'
-      path: '/molecules'
-      fullPath: '/molecules'
-      preLoaderRoute: typeof MoleculesRouteImport
+    '/mobile': {
+      id: '/mobile'
+      path: '/mobile'
+      fullPath: '/mobile'
+      preLoaderRoute: typeof MobileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design': {
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome/complete': {
+      id: '/welcome/complete'
+      path: '/welcome/complete'
+      fullPath: '/welcome/complete'
+      preLoaderRoute: typeof WelcomeCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rig/$rigId': {
@@ -299,9 +319,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   DesignRoute: DesignRoute,
-  MoleculesRoute: MoleculesRoute,
-  TmuxRoute: TmuxRoute,
+  MobileRoute: MobileRoute,
+  VisionosRoute: VisionosRoute,
   RigRigIdRoute: RigRigIdRoute,
+  WelcomeCompleteRoute: WelcomeCompleteRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoStartApiRequestRoute: DemoStartApiRequestRoute,
   DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,
