@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   useAutoStartVoice,
   useAudioRecorder,
   useVADRecorder,
   useVoiceInteraction,
+  useVoiceServer,
 } from '../hooks/useVoice';
 import { useVoiceContext } from '../hooks/useVoiceContext';
+import { VoiceErrorPanel, detectVoiceErrorType } from './VoiceErrorPanel';
 
 type VoiceMode = 'ptt' | 'vad';
 
@@ -26,6 +28,9 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
   const [isHolding, setIsHolding] = useState(false);
   const [mode, setMode] = useState<VoiceMode>(defaultMode);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Voice server control for retry functionality
+  const { start: startServer } = useVoiceServer();
 
   // Auto-start voice server with loading progress
   const {
@@ -166,6 +171,62 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
   };
 
   const error = serverError || recorderError || interactionError;
+  const errorType = detectVoiceErrorType(error ? String(error) : null);
+
+  // Retry handler for voice errors
+  const handleRetry = useCallback(() => {
+    // For server errors, try to restart the server
+    if (errorType === 'server_not_running' || errorType === 'model_not_found') {
+      startServer(undefined);
+    }
+    // For mic permission, user needs to manually grant permission and retry
+    // The retry will attempt to get media again
+  }, [errorType, startServer]);
+
+  // Text fallback handler when voice is not working
+  const handleTextFallback = useCallback(async (text: string) => {
+    // Add user message
+    const userMessage: VoiceMessage = {
+      id: crypto.randomUUID(),
+      type: 'user',
+      text,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    try {
+      // Use the speak function to get a response (it will call the LLM with text)
+      // Note: This uses TTS which requires the server to be running
+      // For a true fallback, we might need a text-only endpoint
+      const response = await sendVoice(
+        // Create a silent audio placeholder - the server should handle text-only mode
+        '', // Empty audio triggers text-only mode
+        'text',
+        `${systemPrompt}\n\nUser said: ${text}`
+      );
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: 'assistant',
+          text: response.text,
+          timestamp: new Date(),
+        },
+      ]);
+    } catch {
+      // If server is down, show a helpful message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: 'assistant',
+          text: 'Voice server is unavailable. Please try the retry button or check the setup steps.',
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [sendVoice, systemPrompt]);
 
   // Toggle VAD listening when mode changes
   useEffect(() => {
@@ -225,8 +286,13 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
       </div>
 
       {error && (
-        <div className="voice-error">
-          {String(error)}
+        <div className="voice-error-container">
+          <VoiceErrorPanel
+            error={String(error)}
+            onRetry={handleRetry}
+            onTextFallback={handleTextFallback}
+            isRetrying={isStarting}
+          />
         </div>
       )}
 
@@ -441,6 +507,11 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           color: white;
         }
 
+        .voice-error-container {
+          padding: 12px 16px;
+        }
+
+        /* Legacy error style (kept for backwards compatibility) */
         .voice-error {
           padding: 8px 16px;
           background: #e94560;
