@@ -36,12 +36,13 @@ export default function Header() {
           <Menu size={24} />
         </button>
         <h1 className="ml-4 text-xl font-semibold">
-          <Link to="/">
+          <Link to="/" className="flex items-center gap-3">
             <img
-              src="/tanstack-word-logo-white.svg"
-              alt="TanStack Logo"
-              className="h-10"
+              src="/gastown-banner.jpg"
+              alt="Gas Town"
+              className="h-10 rounded"
             />
+            <span className="text-lg font-bold tracking-wide">Gas Town</span>
           </Link>
         </h1>
       </header>
