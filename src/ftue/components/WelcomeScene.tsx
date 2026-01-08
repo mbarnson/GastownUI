@@ -1,6 +1,7 @@
 import { Logo } from './Logo'
 import { SetupChecklist } from './SetupChecklist'
 import { MicrophoneIndicator } from './MicrophoneIndicator'
+import { MusicToggle } from './MusicToggle'
 import type { FTUEState } from '../types'
 import { getChecklistFromSetup } from '../types'
 
@@ -21,7 +22,10 @@ export function WelcomeScene({
   const checklist = getChecklistFromSetup(state.setupState)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col relative">
+      {/* Music toggle - top right */}
+      <MusicToggle className="absolute top-4 right-4 z-10" />
+
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
         {/* Logo and tagline */}
