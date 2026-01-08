@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
+import { SelfTestPanel } from '../components/SelfTestPanel'
+import { TmuxPanel } from '../components/TmuxPanel'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import {
   Truck,
@@ -7,11 +10,13 @@ import {
   Circle,
   Activity,
   AlertTriangle,
+  TestTube2,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
 
 function Dashboard() {
+  const [showSelfTest, setShowSelfTest] = useState(false)
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
@@ -39,6 +44,18 @@ function Dashboard() {
               <Terminal className="w-4 h-4" />
               <span>{sessions?.length || 0} Sessions</span>
             </div>
+            <button
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                showSelfTest
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'hover:bg-slate-700'
+              }`}
+              onClick={() => setShowSelfTest(!showSelfTest)}
+              title="Voice Self-Test"
+            >
+              <TestTube2 className="w-4 h-4" />
+              <span>Self-Test</span>
+            </button>
           </div>
         </div>
       </header>
@@ -126,47 +143,20 @@ function Dashboard() {
               )}
             </section>
 
-            {/* Tmux Sessions */}
-            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Terminal className="w-5 h-5 text-amber-400" />
-                Active Sessions
-              </h2>
-              {sessions && sessions.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {sessions.map((session) => (
-                    <div
-                      key={session.name}
-                      className="bg-slate-900/50 rounded-lg p-3 border border-slate-600"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            session.attached ? 'bg-emerald-400' : 'bg-gray-500'
-                          }`}
-                        />
-                        <span className="text-white text-sm font-medium truncate">
-                          {session.name}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {session.windows} window{session.windows !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-gray-400 text-center py-4">
-                  No active tmux sessions
-                </div>
-              )}
-            </section>
+            {/* Tmux Sessions - Click to open terminal */}
+            <TmuxPanel />
           </div>
 
-          {/* Voice Interface sidebar */}
+          {/* Voice Interface / Self-Test sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-6 h-[calc(100vh-8rem)]">
-              <VoiceInterface />
+            <div className="sticky top-6 space-y-6">
+              {showSelfTest ? (
+                <SelfTestPanel />
+              ) : (
+                <div className="h-[calc(100vh-8rem)]">
+                  <VoiceInterface />
+                </div>
+              )}
             </div>
           </div>
         </div>

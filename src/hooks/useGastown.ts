@@ -1,438 +1,221 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { invoke } from '@tauri-apps/api/core'
-import type {
-  Bead,
-  BeadStatus,
-  Convoy,
-  TownStatus,
-  CommandResult,
-  TmuxSession,
-  ActivityItem,
-} from '../types/gastown'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-// Additional types from rig view
-export interface Polecat {
-  name: string
-  rig: string
-  status: 'active' | 'idle' | 'stuck'
-  currentWork?: string
-  branch?: string
+// Types for Gas Town entities
+export interface CommandResult {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
 }
 
-export interface CrewMember {
-  name: string
-  rig: string
-  status: 'active' | 'idle'
-  worktree?: string
+export interface TmuxSession {
+  name: string;
+  windows: number;
+  attached: boolean;
 }
 
-export interface MergeQueueItem {
-  id: string
-  branch: string
-  polecat: string
-  status: 'pending' | 'processing' | 'conflict' | 'merged'
-  position: number
+export interface Convoy {
+  id: string;
+  name: string;
+  progress: number;
+  status: string;
+  polecats: string[];
 }
 
-// Helper to run gt/bd commands via Tauri
+export interface Bead {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  type: string;
+  assignee?: string;
+}
+
+export type BeadStatus = 'open' | 'in_progress' | 'closed' | 'blocked';
+
+// Query key factory
+const queryKeys = {
+  convoys: ['convoys'] as const,
+  beads: (rig?: string, status?: BeadStatus) => ['beads', rig, status] as const,
+  tmux: ['tmux'] as const,
+  status: ['gastown', 'status'] as const,
+};
+
+/**
+ * Execute a gt or bd command
+ */
 export async function runCommand(cmd: string, args: string[]): Promise<CommandResult> {
-  return invoke<CommandResult>('run_gt_command', { cmd, args })
+  return invoke<CommandResult>('run_gt_command', { cmd, args });
 }
 
-// Check if running in Tauri context
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window
-}
-
-// Check if in browser (for SSR safety)
-const isBrowser = typeof window !== 'undefined'
-
-// Mock data for development without Tauri
-const mockBeads: Bead[] = [
-  {
-    id: 'ga-9mv',
-    title: 'Dashboard View - The Refinery Floor',
-    status: 'in_progress',
-    type: 'feature',
-    priority: 2,
-    assignee: 'GastownUI/slit',
-    created: '2026-01-07',
-    updated: '2026-01-07',
-  },
-  {
-    id: 'ga-mmy',
-    title: 'Voice Command Interface - Snarky LFM2.5',
-    status: 'open',
-    type: 'feature',
-    priority: 1,
-    created: '2026-01-07',
-    updated: '2026-01-07',
-  },
-  {
-    id: 'ga-egk',
-    title: 'Tmux Integration Panel - Window into chaos',
-    status: 'open',
-    type: 'feature',
-    priority: 2,
-    created: '2026-01-07',
-    updated: '2026-01-07',
-  },
-]
-
-const mockConvoys: Convoy[] = [
-  {
-    id: 'convoy-001',
-    name: 'Phase 1: Core UI MVP',
-    beads: ['ga-9mv', 'ga-mmy', 'ga-egk', 'ga-jj2'],
-    progress: 25,
-    active_polecats: 2,
-    status: 'running',
-    created: '2026-01-07',
-    eta: '~2 hours',
-  },
-]
-
-const mockTownStatus: TownStatus = {
-  healthy: true,
-  rigs: [
-    {
-      name: 'GastownUI',
-      path: '/Users/patbarnson/gt/GastownUI',
-      polecats: [
-        {
-          name: 'slit',
-          rig: 'GastownUI',
-          status: 'active',
-          current_work: 'ga-9mv',
-          last_activity: new Date().toISOString(),
-        },
-        {
-          name: 'furiosa',
-          rig: 'GastownUI',
-          status: 'idle',
-          last_activity: new Date().toISOString(),
-        },
-      ],
-      beads_count: { open: 3, in_progress: 1, closed: 1, blocked: 0 },
-    },
-  ],
-  active_agents: 2,
-  running_convoys: 1,
-  cost_today: 47.23,
-  cost_rate: 12.5,
-}
-
-const mockActivity: ActivityItem[] = [
-  {
-    id: 'act-1',
-    timestamp: new Date().toISOString(),
-    type: 'bead_update',
-    message: 'Polecat slit claimed ga-9mv',
-    actor: 'slit',
-    bead_id: 'ga-9mv',
-  },
-  {
-    id: 'act-2',
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-    type: 'merge',
-    message: 'Refinery merged ga-6tk (scaffold) to main',
-    actor: 'refinery',
-    bead_id: 'ga-6tk',
-  },
-  {
-    id: 'act-3',
-    timestamp: new Date(Date.now() - 120000).toISOString(),
-    type: 'convoy',
-    message: 'Convoy "Phase 1: Core UI MVP" started',
-    actor: 'mayor',
-  },
-]
-
-// Parse bd list output
-function parseBeadsOutput(output: string): Bead[] {
-  const lines = output.trim().split('\n').filter(Boolean)
-  const beads: Bead[] = []
+/**
+ * Parse convoy list output
+ */
+function parseConvoyList(output: string): Convoy[] {
+  const lines = output.split('\n').filter(line => line.trim());
+  const convoys: Convoy[] = [];
 
   for (const line of lines) {
-    // Parse format: "id [Priority] [type] status - title"
-    const match = line.match(/^(\S+)\s+\[P?(\d)\]\s+\[([^\]]+)\]\s+(\w+)\s+-\s+(.+)$/)
+    // Parse convoy lines like: "1. 🚚 hq-cv-xxx: Name ●"
+    const match = line.match(/\d+\.\s+🚚\s+(\S+):\s+(.+?)\s*[●○]/);
+    if (match) {
+      convoys.push({
+        id: match[1],
+        name: match[2].trim(),
+        progress: 0,
+        status: line.includes('●') ? 'active' : 'completed',
+        polecats: [],
+      });
+    }
+  }
+
+  return convoys;
+}
+
+/**
+ * Parse beads list output
+ */
+function parseBeadsList(output: string): Bead[] {
+  const lines = output.split('\n').filter(line => line.trim());
+  const beads: Bead[] = [];
+
+  for (const line of lines) {
+    // Parse bead lines like: "ga-xxx [P2] [task] open - Title"
+    const match = line.match(/^(\S+)\s+\[P(\d)\]\s+\[(\w+)\]\s+(\w+)\s+-\s+(.+)$/);
     if (match) {
       beads.push({
         id: match[1],
         priority: parseInt(match[2]),
-        type: match[3] as Bead['type'],
-        status: match[4] as BeadStatus,
-        title: match[5],
-        created: '',
-        updated: '',
-      })
+        type: match[3],
+        status: match[4],
+        title: match[5].trim(),
+      });
     }
   }
-  return beads
+
+  return beads;
 }
 
-// Parse gt polecat list output
-function parsePolecatsOutput(output: string, rigName: string): Polecat[] {
-  const lines = output.trim().split('\n').filter(Boolean)
-  const polecats: Polecat[] = []
-
-  for (const line of lines) {
-    const parts = line.trim().split(/\s+/)
-    if (parts.length >= 1 && parts[0]) {
-      polecats.push({
-        name: parts[0].replace(/[^\w-]/g, ''),
-        rig: rigName,
-        status: line.includes('active') ? 'active' : line.includes('stuck') ? 'stuck' : 'idle',
-        currentWork: undefined,
-      })
-    }
-  }
-  return polecats
-}
-
-// Real-time convoy status (2s polling)
+/**
+ * Hook for fetching convoy list
+ */
 export function useConvoys() {
   return useQuery({
-    queryKey: ['convoys'],
-    queryFn: async (): Promise<Convoy[]> => {
-      if (!isTauri()) {
-        return mockConvoys
-      }
-
-      const result = await runCommand('gt', ['convoy', 'list'])
+    queryKey: queryKeys.convoys,
+    queryFn: async () => {
+      const result = await runCommand('gt', ['convoy', 'list']);
       if (result.exit_code !== 0) {
-        console.warn('gt convoy list failed:', result.stderr)
-        return []
+        throw new Error(result.stderr || 'Failed to list convoys');
       }
-
-      // TODO: Implement actual parsing when we know the format
-      return []
+      return parseConvoyList(result.stdout);
     },
     refetchInterval: 2000,
-    staleTime: 1000,
-  })
+  });
 }
 
-// Fetch all rigs in the town
-export function useRigs() {
+/**
+ * Hook for fetching beads list
+ */
+export function useBeads(rig?: string, status?: BeadStatus) {
   return useQuery({
-    queryKey: ['rigs'],
+    queryKey: queryKeys.beads(rig, status),
     queryFn: async () => {
-      const result = await runCommand('gt', ['rigs'])
+      const args = ['list'];
+      if (status) {
+        args.push('--status', status);
+      }
+      const result = await runCommand('bd', args);
       if (result.exit_code !== 0) {
-        throw new Error(result.stderr || 'Failed to list rigs')
+        throw new Error(result.stderr || 'Failed to list beads');
       }
-      return result.stdout.trim().split('\n').filter(Boolean)
-    },
-    refetchInterval: 10000,
-    enabled: isBrowser,
-  })
-}
-
-// Beads for dashboard (status filter) or rig view (rig filter)
-export function useBeads(rigOrStatus?: string, status?: BeadStatus) {
-  return useQuery({
-    queryKey: ['beads', rigOrStatus, status],
-    queryFn: async (): Promise<Bead[]> => {
-      if (!isTauri()) {
-        const filterStatus = status || (rigOrStatus as BeadStatus)
-        return filterStatus
-          ? mockBeads.filter((b) => b.status === filterStatus)
-          : mockBeads
-      }
-
-      const args = ['list']
-      const filterStatus = status || rigOrStatus
-      if (filterStatus && ['open', 'in_progress', 'closed'].includes(filterStatus)) {
-        args.push('--status', filterStatus)
-      }
-
-      const result = await runCommand('bd', args)
-      if (result.exit_code !== 0 && !result.stdout) {
-        console.warn('bd list failed:', result.stderr)
-        return []
-      }
-
-      return parseBeadsOutput(result.stdout)
+      return parseBeadsList(result.stdout);
     },
     refetchInterval: 5000,
-    staleTime: 2000,
-    enabled: isBrowser,
-  })
+  });
 }
 
-// Fetch polecats for a rig
-export function usePolecats(rig: string) {
-  return useQuery({
-    queryKey: ['polecats', rig],
-    queryFn: async () => {
-      const result = await runCommand('gt', ['polecat', 'list', rig])
-      if (result.exit_code !== 0 && !result.stdout) {
-        throw new Error(result.stderr || 'Failed to list polecats')
-      }
-      return parsePolecatsOutput(result.stdout, rig)
-    },
-    refetchInterval: 5000,
-    enabled: isBrowser,
-  })
-}
-
-// Fetch merge queue status for a rig
-export function useMergeQueue(rig: string) {
-  return useQuery({
-    queryKey: ['mergeQueue', rig],
-    queryFn: async () => {
-      const result = await runCommand('gt', ['refinery', 'queue', rig])
-      if (result.exit_code !== 0 && !result.stdout) {
-        return [] as MergeQueueItem[]
-      }
-      const items: MergeQueueItem[] = []
-      const lines = result.stdout.trim().split('\n').filter(Boolean)
-      lines.forEach((line, idx) => {
-        const parts = line.split(/\s+/)
-        if (parts.length >= 2) {
-          items.push({
-            id: parts[0],
-            branch: parts[1] || parts[0],
-            polecat: parts[2] || 'unknown',
-            status: 'pending',
-            position: idx + 1,
-          })
-        }
-      })
-      return items
-    },
-    refetchInterval: 5000,
-    enabled: isBrowser,
-  })
-}
-
-// Town status (health, rigs, agents)
-export function useTownStatus() {
-  return useQuery({
-    queryKey: ['townStatus'],
-    queryFn: async (): Promise<TownStatus> => {
-      if (!isTauri()) {
-        return mockTownStatus
-      }
-
-      const [statusResult, rigsResult] = await Promise.all([
-        runCommand('gt', ['status']),
-        runCommand('gt', ['rigs']),
-      ])
-
-      return {
-        healthy: statusResult.exit_code === 0,
-        rigs: [],
-        active_agents: 0,
-        running_convoys: 0,
-      }
-    },
-    refetchInterval: 5000,
-    staleTime: 2000,
-  })
-}
-
-// Activity feed
-export function useActivityFeed() {
-  return useQuery({
-    queryKey: ['activity'],
-    queryFn: async (): Promise<ActivityItem[]> => {
-      if (!isTauri()) {
-        return mockActivity
-      }
-
-      // TODO: Read from beads interactions.jsonl
-      return []
-    },
-    refetchInterval: 3000,
-    staleTime: 1000,
-  })
-}
-
-// Tmux sessions
+/**
+ * Hook for fetching tmux sessions
+ */
 export function useTmuxSessions() {
   return useQuery({
-    queryKey: ['tmuxSessions'],
-    queryFn: async (): Promise<TmuxSession[]> => {
-      if (!isTauri()) {
-        return [
-          { name: 'gastown-slit', windows: 1, attached: true },
-          { name: 'gastown-refinery', windows: 1, attached: false },
-        ]
-      }
-
-      return invoke<TmuxSession[]>('list_tmux_sessions')
-    },
+    queryKey: queryKeys.tmux,
+    queryFn: () => invoke<TmuxSession[]>('list_tmux_sessions'),
     refetchInterval: 5000,
-    staleTime: 2000,
-  })
+  });
 }
 
-// Sling work mutation
+/**
+ * Hook for Gas Town status
+ */
+export function useGastownStatus() {
+  return useQuery({
+    queryKey: queryKeys.status,
+    queryFn: async () => {
+      const result = await runCommand('gt', ['status']);
+      return {
+        output: result.stdout,
+        healthy: result.exit_code === 0,
+      };
+    },
+    refetchInterval: 10000,
+  });
+}
+
+/**
+ * Mutation hook for slinging work
+ */
 export function useSling() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      bead,
-      rig,
-    }: {
-      bead: string
-      rig: string
-    }): Promise<CommandResult> => {
-      if (!isTauri()) {
-        return { stdout: 'Mock sling successful', stderr: '', exit_code: 0 }
-      }
-
-      return runCommand('gt', ['sling', bead, rig])
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['convoys'] })
-      queryClient.invalidateQueries({ queryKey: ['beads'] })
-      queryClient.invalidateQueries({ queryKey: ['polecats'] })
-      queryClient.invalidateQueries({ queryKey: ['mergeQueue'] })
-    },
-  })
-}
-
-// Close bead mutation
-export function useCloseBead() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ beadId, reason }: { beadId: string; reason?: string }): Promise<CommandResult> => {
-      if (!isTauri()) {
-        return { stdout: 'Mock close successful', stderr: '', exit_code: 0 }
-      }
-
-      const args = ['close', beadId]
-      if (reason) {
-        args.push('--reason', reason)
-      }
-      return runCommand('bd', args)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['beads'] })
-      queryClient.invalidateQueries({ queryKey: ['activity'] })
-    },
-  })
-}
-
-// Update bead status
-export function useUpdateBead() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ beadId, status }: { beadId: string; status: BeadStatus }) => {
-      const result = await runCommand('bd', ['update', beadId, '--status', status])
+    mutationFn: async ({ bead, rig }: { bead: string; rig: string }) => {
+      const result = await runCommand('gt', ['sling', bead, rig]);
       if (result.exit_code !== 0) {
-        throw new Error(result.stderr || 'Failed to update bead')
+        throw new Error(result.stderr || 'Failed to sling work');
       }
-      return result
+      return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['beads'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.convoys });
+      queryClient.invalidateQueries({ queryKey: ['beads'] });
     },
-  })
+  });
+}
+
+/**
+ * Mutation hook for stopping agents
+ */
+export function useStopAgent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (agent?: string) => {
+      const args = agent ? ['stop', agent] : ['stop', '--all'];
+      const result = await runCommand('gt', args);
+      if (result.exit_code !== 0) {
+        throw new Error(result.stderr || 'Failed to stop agent');
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.convoys });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tmux });
+    },
+  });
+}
+
+/**
+ * Mutation hook for nudging agents
+ */
+export function useNudgeAgent() {
+  return useMutation({
+    mutationFn: async (agent: string) => {
+      const result = await runCommand('gt', ['nudge', agent]);
+      if (result.exit_code !== 0) {
+        throw new Error(result.stderr || 'Failed to nudge agent');
+      }
+      return result;
+    },
+  });
 }

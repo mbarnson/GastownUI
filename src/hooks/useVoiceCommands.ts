@@ -102,7 +102,7 @@ const commandPatterns: CommandPattern[] = [
     ],
     handler: async () => {
       const result = await runCommand('bd', ['blocked']);
-      const lines = result.stdout.trim().split('\n').filter((l: string) => l.trim());
+      const lines = result.stdout.trim().split('\n').filter(l => l.trim());
       if (lines.length === 0 || result.stdout.includes('no blocked')) {
         return {
           success: true,
@@ -130,7 +130,7 @@ const commandPatterns: CommandPattern[] = [
     ],
     handler: async () => {
       const result = await runCommand('bd', ['ready']);
-      const lines = result.stdout.trim().split('\n').filter((l: string) => l.trim() && !l.includes('Ready work'));
+      const lines = result.stdout.trim().split('\n').filter(l => l.trim() && !l.includes('Ready work'));
       return {
         success: true,
         message: lines.length > 0
