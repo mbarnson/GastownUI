@@ -1,0 +1,133 @@
+{
+  "version": "2.0",
+  "description": "Pre-baked voice clips for FTUE (First-Time User Experience)",
+  "model": "LFM2.5-Audio-1.5B-GGUF",
+  "format": "wav",
+  "sampleRate": 24000,
+  "channels": 1,
+  "normalization": {
+    "targetLUFS": -16,
+    "truePeak": -1
+  },
+  "clips": [
+    {
+      "id": "welcome",
+      "filename": "01-welcome.wav",
+      "script": "Welcome to Gas Town. I'm your slightly snarky assistant, and I promise I'm here to help. Mostly.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "dashboard-intro",
+      "filename": "02-dashboard-intro.wav",
+      "script": "This is the Refinery Floor - your command center. Convoys on the left, activity on the right. Try not to break anything.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "convoy-explained",
+      "filename": "03-convoy-explained.wav",
+      "script": "Convoys are batches of work moving through the system. Think of them as road trains hauling your tasks. The progress bars tell you how close you are to done.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "polecat-intro",
+      "filename": "04-polecat-intro.wav",
+      "script": "Polecats are your worker agents. They're ephemeral - they spawn, do work, and disappear. Like good code reviewers.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "rig-explained",
+      "filename": "05-rig-explained.wav",
+      "script": "A rig is your project container. It has polecats, a merge queue called the refinery, and a witness that makes sure nobody gets stuck.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "beads-intro",
+      "filename": "06-beads-intro.wav",
+      "script": "Beads are your issues - bugs, features, tasks. We track them so you don't have to remember everything. Unlike your brain, we don't forget.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "voice-command-hint",
+      "filename": "07-voice-command-hint.wav",
+      "script": "You can talk to me. Just hold the spacebar and ask. Or click the mic button if you're feeling fancy.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "tmux-panel",
+      "filename": "08-tmux-panel.wav",
+      "script": "The tmux panel shows your terminal sessions. Yes, there's still a command line underneath. Old habits die hard.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "sling-work",
+      "filename": "09-sling-work.wav",
+      "script": "To assign work, say 'sling that to' followed by the rig name. Or use the UI if you're into clicking things.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "cost-tracking",
+      "filename": "10-cost-tracking.wav",
+      "script": "We track costs so you don't accidentally burn through your budget. You can set alerts. I'll nag you. It's what I do.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "offline-mode",
+      "filename": "11-offline-mode.wav",
+      "script": "Lost connection? No worries. I'll cache what I can and sync when you're back online. I'm helpful like that.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "keyboard-shortcuts",
+      "filename": "12-keyboard-shortcuts.wav",
+      "script": "Command-K opens the command palette. It's faster than clicking around. Trust me on this one.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "activity-feed",
+      "filename": "13-activity-feed.wav",
+      "script": "The activity feed shows what's happening in real-time. Commits, merges, stuck polecats - all the drama.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "merge-queue",
+      "filename": "14-merge-queue.wav",
+      "script": "The refinery is your merge queue. Work goes in, clean code comes out. Usually.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "witness-role",
+      "filename": "15-witness-role.wav",
+      "script": "The witness monitors polecats. If one gets stuck, it nudges them. Think of it as a nervous hall monitor.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "help-available",
+      "filename": "16-help-available.wav",
+      "script": "Need help? Just ask 'what can you do' or 'help me with' something. I'm snarky, not unhelpful.",
+      "duration": null,
+      "generated": false
+    },
+    {
+      "id": "ftue-complete",
+      "filename": "17-ftue-complete.wav",
+      "script": "That's the basics. You're ready to cause some chaos. Don't worry, I'll be here to judge your code.",
+      "duration": null,
+      "generated": false
+    }
+  ]
+}

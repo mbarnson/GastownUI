@@ -308,6 +308,22 @@ export function useMergeQueue(rig: string) {
   })
 }
 
+// Reorder merge queue items (drag and drop)
+export function useReorderMergeQueue(_rig: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ itemId, newPosition }: { itemId: string; newPosition: number }) => {
+      // TODO: Implement actual reorder command when gt supports it
+      // For now, this is a no-op placeholder
+      console.log(`Would reorder ${itemId} to position ${newPosition}`)
+      return { success: true }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mergeQueue'] })
+    },
+  })
+}
+
 // Town status (health, rigs, agents)
 export function useTownStatus() {
   return useQuery({
