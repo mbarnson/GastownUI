@@ -2,28 +2,19 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
 
 import Header from '../components/Header'
+
+import appCss from '../styles.css?url'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5000,
-      retry: 1,
+      staleTime: 1000,
+      refetchOnWindowFocus: false,
     },
   },
 })
-import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
-import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
-import { SidebarModeProvider } from '../contexts/SidebarModeContext'
-import { FTUEProvider } from '../contexts/FTUEContext'
-import { AudioProvider } from '../components/ftue/AudioManager'
-import { LiveRegionProvider } from '../components/a11y/LiveRegion'
-import SkipLink from '../components/SkipLink'
-import VoiceControlOverlay from '../components/VoiceControlOverlay'
-
-import appCss from '../styles.css?url'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -36,7 +27,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'GastownUI - Gas Town Dashboard',
+        title: 'GAS TOWN',
       },
     ],
     links: [
@@ -56,54 +47,24 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <QueryClientProvider client={queryClient}>
-        <CalmModeProvider>
-          <SimplifyModeProvider>
-            <SidebarModeProvider>
-              <FTUEProvider>
-                <AudioProvider>
-                  <LiveRegionProvider>
-                    <RootBody>{children}</RootBody>
-                  </LiveRegionProvider>
-                </AudioProvider>
-              </FTUEProvider>
-            </SidebarModeProvider>
-          </SimplifyModeProvider>
-        </CalmModeProvider>
-      </QueryClientProvider>
+      <body>
+        <QueryClientProvider client={queryClient}>
+          <Header />
+          {children}
+          <TanStackDevtools
+            config={{
+              position: 'bottom-right',
+            }}
+            plugins={[
+              {
+                name: 'Tanstack Router',
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
+        </QueryClientProvider>
+        <Scripts />
+      </body>
     </html>
-  )
-}
-
-function RootBody({ children }: { children: React.ReactNode }) {
-  const { isCalm } = useCalmMode()
-  useEffect(() => {
-    if ('scrollRestoration' in window.history) {
-      window.history.scrollRestoration = 'manual'
-    }
-    window.scrollTo(0, 0)
-  }, [])
-
-  return (
-    <body className={isCalm ? 'calm-mode' : ''}>
-      <SkipLink />
-      <Header />
-      <main id="main-content" tabIndex={-1} className="outline-none">
-        {children}
-      </main>
-      <VoiceControlOverlay />
-      <TanStackDevtools
-        config={{
-          position: 'bottom-right',
-        }}
-        plugins={[
-          {
-            name: 'Tanstack Router',
-            render: <TanStackRouterDevtoolsPanel />,
-          },
-        ]}
-      />
-      <Scripts />
-    </body>
   )
 }
