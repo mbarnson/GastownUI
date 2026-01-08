@@ -676,3 +676,43 @@ export function useCreateWorkspace() {
     },
   })
 }
+
+// Reorder merge queue items with optimistic updates
+export function useReorderMergeQueue(rig: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (newOrder: MergeQueueItem[]): Promise<CommandResult> => {
+      if (!isTauri()) {
+        return { stdout: 'Mock reorder successful', stderr: '', exit_code: 0 }
+      }
+
+      // Extract item IDs in new order
+      const itemIds = newOrder.map((item) => item.id)
+      return runCommand('gt', ['refinery', 'reorder', rig, ...itemIds])
+    },
+    onMutate: async (newOrder) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['mergeQueue', rig] })
+
+      // Snapshot the previous value
+      const previousItems = queryClient.getQueryData<MergeQueueItem[]>(['mergeQueue', rig])
+
+      // Optimistically update to the new order
+      queryClient.setQueryData<MergeQueueItem[]>(['mergeQueue', rig], newOrder)
+
+      // Return a context object with the previous value
+      return { previousItems }
+    },
+    onError: (_err, _newOrder, context) => {
+      // Rollback to the previous value on error
+      if (context?.previousItems) {
+        queryClient.setQueryData(['mergeQueue', rig], context.previousItems)
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure we have the server state
+      queryClient.invalidateQueries({ queryKey: ['mergeQueue', rig] })
+    },
+  })
+}

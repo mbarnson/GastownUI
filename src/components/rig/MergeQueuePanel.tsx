@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { GitMerge, GripVertical, AlertTriangle, Check, Clock, Loader2 } from 'lucide-react'
 import type { MergeQueueItem } from '../../hooks/useGastown'
+import { useReorderMergeQueue } from '../../hooks/useGastown'
 
 interface MergeQueuePanelProps {
   items: MergeQueueItem[]
@@ -34,13 +35,16 @@ const statusConfig = {
   },
 }
 
-export default function MergeQueuePanel({ items, rigId: _rigId }: MergeQueuePanelProps) {
+export default function MergeQueuePanel({ items, rigId }: MergeQueuePanelProps) {
   const [draggedItem, setDraggedItem] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [orderedItems, setOrderedItems] = useState(items)
+  const reorderMutation = useReorderMergeQueue(rigId)
 
-  // Update ordered items when props change
-  if (items.length !== orderedItems.length ||
-      items.some((item, idx) => item.id !== orderedItems[idx]?.id)) {
+  // Update ordered items when props change (unless mutation is pending)
+  if (!reorderMutation.isPending &&
+      (items.length !== orderedItems.length ||
+       items.some((item, idx) => item.id !== orderedItems[idx]?.id))) {
     setOrderedItems(items)
   }
 
@@ -49,13 +53,21 @@ export default function MergeQueuePanel({ items, rigId: _rigId }: MergeQueuePane
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+    if (targetId !== draggedItem) {
+      setDropTarget(targetId)
+    }
+  }
+
+  const handleDragLeave = () => {
+    setDropTarget(null)
   }
 
   const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
+    setDropTarget(null)
     if (!draggedItem || draggedItem === targetId) return
 
     const newItems = [...orderedItems]
@@ -70,13 +82,15 @@ export default function MergeQueuePanel({ items, rigId: _rigId }: MergeQueuePane
         item.position = idx + 1
       })
       setOrderedItems(newItems)
-      // TODO: Call mutation to persist order change
+      // Persist order change with optimistic updates
+      reorderMutation.mutate(newItems)
     }
     setDraggedItem(null)
   }
 
   const handleDragEnd = () => {
     setDraggedItem(null)
+    setDropTarget(null)
   }
 
   return (
@@ -105,18 +119,25 @@ export default function MergeQueuePanel({ items, rigId: _rigId }: MergeQueuePane
                 key={item.id}
                 draggable
                 onDragStart={(e) => handleDragStart(e, item.id)}
-                onDragOver={handleDragOver}
+                onDragOver={(e) => handleDragOver(e, item.id)}
+                onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, item.id)}
                 onDragEnd={handleDragEnd}
                 className={`
-                  flex items-center gap-3 p-3 rounded-lg border transition-all
+                  flex items-center gap-3 p-3 rounded-lg border transition-all relative
                   ${draggedItem === item.id
                     ? 'opacity-50 border-purple-500 bg-purple-500/10'
-                    : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                    : dropTarget === item.id
+                      ? 'border-purple-400 bg-purple-500/20 ring-2 ring-purple-400/50'
+                      : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
                   }
                   cursor-grab active:cursor-grabbing
                 `}
               >
+                {/* Drop indicator line */}
+                {dropTarget === item.id && draggedItem && (
+                  <div className="absolute -top-1 left-0 right-0 h-0.5 bg-purple-400 rounded-full" />
+                )}
                 <GripVertical className="w-4 h-4 text-gray-500 flex-shrink-0" />
 
                 <span className="text-gray-500 font-mono text-sm w-6">
