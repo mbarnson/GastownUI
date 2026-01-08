@@ -99,7 +99,7 @@ function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <main id="main-content" className="max-w-7xl mx-auto px-6 py-8">
         {/* Setup Banner - shown when setup was skipped or interrupted */}
         <SetupBanner className="mb-6" />
 
@@ -228,13 +228,14 @@ function Dashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Emergency Stop */}
       <div className="fixed bottom-6 right-6">
         <button
           className="p-4 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg shadow-red-600/30 transition-all hover:scale-105"
           title="Emergency Stop All"
+          aria-label="Emergency Stop All Gas Town agents"
           onClick={() => {
             if (window.confirm('Stop ALL Gas Town agents? This cannot be undone.')) {
               // TODO: Implement emergency stop
@@ -242,7 +243,7 @@ function Dashboard() {
             }
           }}
         >
-          <AlertTriangle className="w-6 h-6" />
+          <AlertTriangle className="w-6 h-6" aria-hidden="true" />
         </button>
       </div>
     </div>
