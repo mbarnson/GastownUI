@@ -1,0 +1,52 @@
+description = "Standard feature development workflow for GastownUI"
+formula = "gastownui-feature"
+type = "workflow"
+version = 1
+
+[[steps]]
+id = "design"
+title = "Design {{feature}}"
+description = """
+Design the feature for GastownUI.
+Consider:
+- How does this fit the chaotic aesthetic?
+- What's the voice interaction angle?
+- Cross-platform implications?
+- tmux transparency requirements?
+"""
+
+[[steps]]
+id = "implement"
+title = "Implement {{feature}}"
+needs = ["design"]
+description = """
+Implement the feature.
+Tech stack: TanStack + Tauri + LFM2.5
+Remember: Voice uses ONLY LFM2.5, no separate models.
+"""
+
+[[steps]]
+id = "voice-test"
+title = "Voice-test {{feature}}"
+needs = ["implement"]
+description = """
+Test the feature via voice interaction.
+Can you use this feature entirely through voice?
+Does the snarky personality come through?
+"""
+
+[[steps]]
+id = "review"
+title = "Review {{feature}}"
+needs = ["voice-test"]
+description = "Code review with attention to cross-platform and voice concerns."
+
+[[steps]]
+id = "submit"
+title = "Submit {{feature}}"
+needs = ["review"]
+description = "Submit for merge. Celebrate with appropriate snark."
+
+[vars.feature]
+description = "The feature being implemented"
+required = true
