@@ -1,82 +1,80 @@
-import { useState, useEffect } from 'react'
-import { AlertTriangle, X, ArrowRight } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
-
-const BANNER_DISMISSED_KEY = 'gastownui-setup-banner-dismissed'
+import { useNavigate } from '@tanstack/react-router';
+import { useSetupPreferences } from '../hooks/useSetupPreferences';
+import { useSetupStatus, isSetupComplete } from '../hooks/useSetup';
+import { AlertTriangle, X, ArrowRight, RefreshCw } from 'lucide-react';
 
 interface SetupBannerProps {
-  /** Whether Gas Town setup is complete */
-  isSetupComplete: boolean
+  className?: string;
 }
 
-/** Persistent banner shown when Gas Town setup is incomplete */
-export function SetupBanner({ isSetupComplete }: SetupBannerProps) {
-  const [isDismissed, setIsDismissed] = useState(true) // Default hidden to avoid flash
+/**
+ * Persistent banner shown when setup was skipped or is incomplete.
+ * Per FTUE.md: "Users can skip FTUE at any time. The dashboard shows a persistent banner."
+ */
+export function SetupBanner({ className = '' }: SetupBannerProps) {
+  const navigate = useNavigate();
+  const { preferences, isLoaded, dismissBanner, resetSkip, isInterrupted } = useSetupPreferences();
+  const { data: status } = useSetupStatus();
 
-  // Check localStorage on mount
-  useEffect(() => {
-    const dismissed = localStorage.getItem(BANNER_DISMISSED_KEY) === 'true'
-    setIsDismissed(dismissed)
-  }, [])
+  // Don't show if:
+  // - Not loaded yet
+  // - Banner was dismissed
+  // - Setup is complete (both Go and Beads installed)
+  // - Setup was never skipped and not interrupted
+  if (!isLoaded) return null;
+  if (preferences.setupDismissed) return null;
+  if (status && isSetupComplete(status)) return null;
+  if (!preferences.setupSkipped && !isInterrupted) return null;
 
-  // Don't show if setup is complete or banner is dismissed
-  if (isSetupComplete || isDismissed) {
-    return null
-  }
+  const handleCompleteSetup = () => {
+    resetSkip(); // Clear the skip flag
+    navigate({ to: '/setup' });
+  };
 
   const handleDismiss = () => {
-    setIsDismissed(true)
-    localStorage.setItem(BANNER_DISMISSED_KEY, 'true')
-  }
+    dismissBanner();
+  };
+
+  // Different messages for skipped vs interrupted
+  const message = isInterrupted
+    ? "Setup was interrupted. Resume to enable all features."
+    : "Gas Town not configured. Complete setup to enable all features.";
+
+  const buttonText = isInterrupted ? "Resume Setup" : "Complete Setup";
 
   return (
-    <div className="bg-amber-900/30 border-b border-amber-700/50">
-      <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-            <p className="text-sm text-amber-200">
-              <span className="font-medium">Gas Town not configured.</span>{' '}
-              <span className="text-amber-300/80">
-                Complete setup to enable all features.
-              </span>
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              to="/ftue"
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-amber-100 bg-amber-700/50 hover:bg-amber-600/50 rounded-lg transition-colors"
-            >
-              Complete setup
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <button
-              onClick={handleDismiss}
-              className="p-1.5 text-amber-400 hover:text-amber-200 hover:bg-amber-800/50 rounded transition-colors"
-              title="Dismiss"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+    <div
+      className={`bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center justify-between gap-4 ${className}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-amber-500/20 rounded-lg">
+          {isInterrupted ? (
+            <RefreshCw className="w-5 h-5 text-amber-400" />
+          ) : (
+            <AlertTriangle className="w-5 h-5 text-amber-400" />
+          )}
         </div>
+        <p className="text-sm text-amber-300">{message}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleCompleteSetup}
+          className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-sm transition-colors"
+        >
+          {buttonText}
+          <ArrowRight className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleDismiss}
+          className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+          title="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
     </div>
-  )
+  );
 }
 
-/** Hook to check if setup banner should be shown */
-export function useSetupBannerDismissed(): boolean {
-  const [dismissed, setDismissed] = useState(true)
-
-  useEffect(() => {
-    setDismissed(localStorage.getItem(BANNER_DISMISSED_KEY) === 'true')
-  }, [])
-
-  return dismissed
-}
-
-/** Reset the banner dismissal (for testing or re-prompting) */
-export function resetSetupBanner(): void {
-  localStorage.removeItem(BANNER_DISMISSED_KEY)
-}
+export default SetupBanner;

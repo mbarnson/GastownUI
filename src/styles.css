@@ -14,19 +14,75 @@ code {
     monospace;
 }
 
-/* Safe area insets for iOS notch and home indicator */
-.safe-area-top {
-  padding-top: env(safe-area-inset-top);
+/* Keyboard Accessibility - Focus Styles (ga-1fk) */
+
+/* Show focus outline only for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #f43f5e; /* rose-500 */
+  outline-offset: 2px;
 }
 
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+/* Remove default focus outline when using mouse */
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
-.safe-area-left {
-  padding-left: env(safe-area-inset-left);
+/* Enhanced focus for buttons and interactive elements */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #f43f5e;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-.safe-area-right {
-  padding-right: env(safe-area-inset-right);
+/* Focus ring for form inputs */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #f43f5e;
+  outline-offset: 1px;
+  border-color: #f43f5e;
+}
+
+/* Skip to main content link (appears on tab) */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: #f43f5e;
+  color: white;
+  border-radius: 0 0 8px 8px;
+  z-index: 9999;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Ensure sufficient color contrast for focus states */
+.bg-slate-800 button:focus-visible,
+.bg-slate-900 button:focus-visible {
+  box-shadow: 0 0 0 2px #f43f5e;
+}
+
+/* High contrast focus for dark backgrounds */
+.dark-focus:focus-visible {
+  outline-color: #fb7185; /* rose-400 for better visibility */
+}
+
+/* Keyboard navigation indicator for lists */
+[role="listbox"] [role="option"]:focus,
+[role="menu"] [role="menuitem"]:focus {
+  background-color: rgba(244, 63, 94, 0.1);
+  outline: none;
+}
+
+/* Focus trap prevention - ensure focusable elements are visible */
+[tabindex="-1"]:focus {
+  outline: none;
 }
