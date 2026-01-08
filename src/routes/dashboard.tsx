@@ -13,6 +13,7 @@ import {
   Mic,
   Plus,
 } from 'lucide-react'
+import { SetupBanner } from '../components/SetupBanner'
 import {
   useConvoys,
   useTownStatus,
@@ -128,6 +129,9 @@ function Dashboard() {
           <HealthIndicator status={townStatus} loading={townLoading} />
         </div>
       </header>
+
+      {/* Setup Banner - shown when setup is incomplete */}
+      <SetupBanner className="mb-6" />
 
       {/* Main Grid */}
       <main
