@@ -1,7 +1,9 @@
 mod gastown;
 mod voice;
+mod self_test;
 
 use voice::VoiceServerState;
+use self_test::SelfTestState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -10,6 +12,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .manage(VoiceServerState::default())
+        .manage(SelfTestState::default())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -30,6 +33,11 @@ pub fn run() {
             voice::send_voice_input,
             voice::send_text_to_speech,
             voice::transcribe_audio,
+            self_test::get_self_test_status,
+            self_test::get_test_cases,
+            self_test::start_self_test,
+            self_test::stop_self_test,
+            self_test::add_test_case,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -8,8 +8,8 @@ use tauri::State;
 /// Voice server state managed by Tauri
 pub struct VoiceServerState {
     server_process: Mutex<Option<Child>>,
-    server_url: Mutex<String>,
-    is_ready: Mutex<bool>,
+    pub(crate) server_url: Mutex<String>,
+    pub(crate) is_ready: Mutex<bool>,
 }
 
 impl Default for VoiceServerState {

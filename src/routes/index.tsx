@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
+import { SelfTestPanel } from '../components/SelfTestPanel'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import {
   Truck,
@@ -7,11 +9,13 @@ import {
   Circle,
   Activity,
   AlertTriangle,
+  TestTube2,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
 
 function Dashboard() {
+  const [showSelfTest, setShowSelfTest] = useState(false)
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
@@ -39,6 +43,18 @@ function Dashboard() {
               <Terminal className="w-4 h-4" />
               <span>{sessions?.length || 0} Sessions</span>
             </div>
+            <button
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                showSelfTest
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'hover:bg-slate-700'
+              }`}
+              onClick={() => setShowSelfTest(!showSelfTest)}
+              title="Voice Self-Test"
+            >
+              <TestTube2 className="w-4 h-4" />
+              <span>Self-Test</span>
+            </button>
           </div>
         </div>
       </header>
@@ -163,10 +179,16 @@ function Dashboard() {
             </section>
           </div>
 
-          {/* Voice Interface sidebar */}
+          {/* Voice Interface / Self-Test sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-6 h-[calc(100vh-8rem)]">
-              <VoiceInterface />
+            <div className="sticky top-6 space-y-6">
+              {showSelfTest ? (
+                <SelfTestPanel />
+              ) : (
+                <div className="h-[calc(100vh-8rem)]">
+                  <VoiceInterface />
+                </div>
+              )}
             </div>
           </div>
         </div>
