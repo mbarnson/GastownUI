@@ -158,3 +158,97 @@ code {
   clip: auto;
   white-space: normal;
 }
+
+/* ============================================================================
+   Linux Desktop Theme Integration (GTK/Adwaita)
+   ============================================================================ */
+
+:root {
+  /* GNOME/Adwaita color scheme - light mode */
+  --gtk-accent-color: #3584e4;
+  --gtk-accent-bg-color: #3584e4;
+  --gtk-success-color: #33d17a;
+  --gtk-warning-color: #f6d32d;
+  --gtk-error-color: #e01b24;
+  --gtk-focus-color: #3584e4;
+
+  /* KDE/Breeze color scheme */
+  --qt-accent-color: #3daee9;
+  --qt-link-color: #2980b9;
+  --qt-success-color: #27ae60;
+  --qt-warning-color: #f39c12;
+  --qt-error-color: #da4453;
+}
+
+/* GNOME/Adwaita dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gtk-accent-color: #78aeed;
+    --gtk-accent-bg-color: #3584e4;
+    --gtk-success-color: #8ff0a4;
+    --gtk-warning-color: #f8e45c;
+    --gtk-error-color: #ff7b63;
+    --gtk-focus-color: #78aeed;
+
+    --qt-accent-color: #3daee9;
+    --qt-link-color: #2980b9;
+    --qt-success-color: #27ae60;
+    --qt-warning-color: #fdbc4b;
+    --qt-error-color: #da4453;
+  }
+}
+
+/* ============================================================================
+   Orca Screen Reader Optimizations
+   ============================================================================ */
+
+/* Ensure landmarks are properly identified */
+[role="main"],
+[role="navigation"],
+[role="search"],
+[role="complementary"],
+[role="banner"],
+[role="contentinfo"] {
+  /* Orca needs these to be block-level for proper navigation */
+  display: block;
+}
+
+/* Ensure form groups are properly announced */
+[role="group"][aria-label] {
+  /* Orca reads the group label when entering */
+  display: block;
+}
+
+/* Tables must be properly structured for Orca navigation */
+[role="table"] {
+  display: table;
+}
+
+[role="row"] {
+  display: table-row;
+}
+
+[role="cell"],
+[role="columnheader"],
+[role="rowheader"] {
+  display: table-cell;
+}
+
+/* Ensure live regions don't cause layout shifts */
+[aria-live] {
+  /* Prevent content from causing reflow */
+  contain: layout;
+}
+
+/* Log regions should be scrollable */
+[role="log"] {
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+/* Decorative elements should be hidden from screen readers */
+[role="presentation"],
+[aria-hidden="true"] {
+  /* Orca will skip these in flat review */
+  pointer-events: none;
+}
