@@ -18,6 +18,7 @@ import {
 } from '../hooks/useTmux'
 import { TerminalPreview } from './TerminalPreview'
 import type { SessionHealth, TmuxSession } from '../types/tmux'
+import { focusRingClasses } from '../lib/a11y'
 
 const healthColors: Record<SessionHealth, { dot: string; text: string; label: string; tooltip: string }> = {
   active: { dot: 'text-green-400', text: 'text-green-400', label: 'Active', tooltip: 'Session is actively responding' },
@@ -68,35 +69,46 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
   }
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden hover:border-cyan-500/50 transition-all">
+    <article
+      className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden hover:border-cyan-500/50 transition-all"
+      aria-labelledby={`session-${session.name}-title`}
+    >
       {/* Session Header */}
       <button
         onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-700/30 transition-colors"
+        className={`w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-700/30 transition-colors ${focusRingClasses}`}
+        aria-expanded={isExpanded}
+        aria-controls={`session-${session.name}-content`}
       >
         <div className="flex items-center gap-3">
           {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <ChevronDown className="w-4 h-4 text-slate-300" aria-hidden="true" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <ChevronRight className="w-4 h-4 text-slate-300" aria-hidden="true" />
           )}
-          <Terminal className="w-5 h-5 text-cyan-400" />
-          <span className="font-medium text-white">{session.name}</span>
+          <Terminal className="w-5 h-5 text-cyan-400" aria-hidden="true" />
+          <span id={`session-${session.name}-title`} className="font-medium text-white">
+            {session.name}
+          </span>
           {session.attached && (
             <span className="text-xs px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded">
-              attached
+              <span className="sr-only">Status: </span>attached
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2" title={colors.tooltip}>
-          <Circle className={`w-3 h-3 fill-current ${colors.dot}`} />
+        <div
+          className="flex items-center gap-2"
+          role="status"
+          aria-label={`Session health: ${colors.label}. ${colors.tooltip}`}
+        >
+          <Circle className={`w-3 h-3 fill-current ${colors.dot}`} aria-hidden="true" />
           <span className={`text-sm ${colors.text}`}>{colors.label}</span>
         </div>
       </button>
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="border-t border-slate-700">
+        <div id={`session-${session.name}-content`} className="border-t border-slate-700">
           {/* Terminal Preview */}
           <div className="p-4">
             {isLoading ? (
@@ -127,38 +139,45 @@ function SessionCard({ session, isExpanded, onToggle }: SessionCardProps) {
           )}
 
           {/* Action Buttons */}
-          <div className="px-4 pb-4 flex gap-2">
+          <div className="px-4 pb-4 flex gap-2" role="group" aria-label="Session actions">
             <button
               onClick={handleAttach}
               disabled={attachMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/50 text-white text-sm font-medium rounded-lg transition-colors"
+              className={`flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/50 text-white text-sm font-medium rounded-lg transition-colors ${focusRingClasses}`}
+              aria-label={`Attach to session ${session.name}`}
             >
-              <ExternalLink className="w-4 h-4" />
+              <ExternalLink className="w-4 h-4" aria-hidden="true" />
               {attachMutation.isPending ? 'Opening...' : 'Attach'}
             </button>
             <button
               onClick={handleCopy}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${focusRingClasses} ${
                 copySuccess
                   ? 'bg-green-500/20 text-green-400 border border-green-500/50'
                   : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
               }`}
-              title="Copy connection string to clipboard"
+              aria-label={copySuccess ? 'Connection string copied' : 'Copy connection string to clipboard'}
             >
-              {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copySuccess ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
               {copySuccess ? 'Copied!' : 'Copy'}
             </button>
           </div>
 
           {/* Connection String */}
           <div className="px-4 pb-4">
-            <code className="block w-full px-3 py-2 bg-slate-900 rounded text-xs text-slate-400 font-mono overflow-x-auto">
+            <label className="sr-only" id={`connection-label-${session.name}`}>
+              Connection command for {session.name}
+            </label>
+            <code
+              className="block w-full px-3 py-2 bg-slate-900 rounded text-xs text-slate-300 font-mono overflow-x-auto"
+              aria-labelledby={`connection-label-${session.name}`}
+            >
               {connectionString}
             </code>
           </div>
         </div>
       )}
-    </div>
+    </article>
   )
 }
 
@@ -240,16 +259,17 @@ export function TmuxPanel() {
 
       {/* Footer Stats */}
       {sessions && sessions.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-slate-700 flex items-center justify-between text-sm text-slate-400">
-          <span>
+        <div className="mt-6 pt-4 border-t border-slate-700 flex items-center justify-between text-sm text-slate-300">
+          <span role="status" aria-live="polite">
             {sessions.length} session{sessions.length !== 1 ? 's' : ''} •{' '}
             {sessions.filter((s) => s.attached).length} attached
           </span>
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+            className={`flex items-center gap-1 hover:text-cyan-400 transition-colors ${focusRingClasses}`}
+            aria-label="Refresh session list"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
             Refresh
           </button>
         </div>
