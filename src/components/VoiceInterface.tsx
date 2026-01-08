@@ -27,6 +27,7 @@ export function VoiceInterface() {
     isProcessing,
     error: interactionError,
     sendVoice,
+    transcribe,
   } = useVoiceInteraction();
 
   // Auto-scroll to bottom when new messages arrive
@@ -52,13 +53,20 @@ export function VoiceInterface() {
       };
       setMessages((prev) => [...prev, userMessage]);
 
+      // First transcribe the audio to get user's actual words
+      let userText = '(voice input)';
+      try {
+        userText = await transcribe(audio);
+      } catch {
+        // Fallback to placeholder if transcription fails
+      }
+
       const response = await sendVoice(audio, 'interleaved');
 
-      // Update user message with transcription (if available in future)
-      // and add assistant response
+      // Update user message with actual transcription and add assistant response
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { ...userMessage, text: '(voice input)' },
+        { ...userMessage, text: userText },
         {
           id: crypto.randomUUID(),
           type: 'assistant',
