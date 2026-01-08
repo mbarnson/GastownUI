@@ -1,0 +1,42 @@
+# Fastlane configuration for Gas Town UI iOS
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build the iOS app"
+  lane :build do
+    # Build using Tauri
+    sh "cd ../src-tauri && npm run tauri ios build"
+  end
+
+  desc "Upload to TestFlight"
+  lane :beta do
+    # Build first
+    build
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      ipa: "../src-tauri/gen/apple/build/gastownui.ipa"
+    )
+  end
+
+  desc "Submit to App Store"
+  lane :release do
+    # Build release
+    build
+
+    # Upload to App Store
+    upload_to_app_store(
+      skip_metadata: false,
+      skip_screenshots: true,
+      force: true,
+      ipa: "../src-tauri/gen/apple/build/gastownui.ipa"
+    )
+  end
+
+  desc "Take screenshots for App Store"
+  lane :screenshots do
+    capture_screenshots
+  end
+end
