@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Sandbox required for Mac App Store -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+
+    <!-- Network access for voice server, mail, and API calls -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+
+    <!-- File access for Gas Town workspace -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
+
+    <!-- Audio input for voice interface -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+
+    <!-- Speech recognition for voice commands -->
+    <key>com.apple.security.personal-information.speech-recognition</key>
+    <true/>
+
+    <!-- Allow accessing user's home directory for Gas Town -->
+    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+    <array>
+        <string>/gt/</string>
+    </array>
+</dict>
+</plist>

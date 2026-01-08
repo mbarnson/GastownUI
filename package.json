@@ -12,7 +12,8 @@
     "tauri:build": "tauri build",
     "tauri:ios": "tauri ios",
     "tauri:android": "tauri android",
-    "build:dmg": "./scripts/build-dmg.sh"
+    "build:dmg": "./scripts/build-dmg.sh",
+    "build:appstore": "./scripts/build-app-store.sh"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.0.6",
