@@ -17,7 +17,6 @@ import { Route as MobileRouteImport } from './routes/mobile'
 import { Route as FtueRouteImport } from './routes/ftue'
 import { Route as DesignRouteImport } from './routes/design'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as CompareRouteImport } from './routes/compare'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WelcomeCompleteRouteImport } from './routes/welcome/complete'
 import { Route as RigRigIdRouteImport } from './routes/rig/$rigId'
@@ -67,11 +66,6 @@ const DesignRoute = DesignRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CompareRoute = CompareRouteImport.update({
-  id: '/compare',
-  path: '/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -127,7 +121,6 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
   '/ftue': typeof FtueRoute
@@ -148,7 +141,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
   '/ftue': typeof FtueRoute
@@ -170,7 +162,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
   '/ftue': typeof FtueRoute
@@ -193,7 +184,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/compare'
     | '/dashboard'
     | '/design'
     | '/ftue'
@@ -214,7 +204,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/compare'
     | '/dashboard'
     | '/design'
     | '/ftue'
@@ -235,7 +224,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/compare'
     | '/dashboard'
     | '/design'
     | '/ftue'
@@ -257,7 +245,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CompareRoute: typeof CompareRoute
   DashboardRoute: typeof DashboardRoute
   DesignRoute: typeof DesignRoute
   FtueRoute: typeof FtueRoute
@@ -335,13 +322,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/compare': {
-      id: '/compare'
-      path: '/compare'
-      fullPath: '/compare'
-      preLoaderRoute: typeof CompareRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -417,7 +397,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CompareRoute: CompareRoute,
   DashboardRoute: DashboardRoute,
   DesignRoute: DesignRoute,
   FtueRoute: FtueRoute,
