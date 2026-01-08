@@ -27,7 +27,7 @@ function parseCrewOutput(output: string, rigName: string): CrewMember[] {
 }
 
 export default function CrewPanel({ rigId }: CrewPanelProps) {
-  const { data: crew = [], isLoading, error } = useQuery({
+  const { data: crew = [], isPending, error } = useQuery({
     queryKey: ['crew', rigId],
     queryFn: async () => {
       // gt crew list <rig> - lists named crew members
@@ -41,6 +41,7 @@ export default function CrewPanel({ rigId }: CrewPanelProps) {
       return parseCrewOutput(result.stdout, rigId)
     },
     refetchInterval: 5000,
+    initialData: [], // Prevent indefinite loading state when crew count is 0
   })
 
   const activeCount = crew.filter((c) => c.status === 'active').length
@@ -58,7 +59,7 @@ export default function CrewPanel({ rigId }: CrewPanelProps) {
         </div>
       </div>
 
-      {isLoading ? (
+      {isPending ? (
         <div className="text-center py-8 text-gray-500">
           <div className="animate-pulse">Loading crew...</div>
         </div>
