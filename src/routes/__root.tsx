@@ -5,6 +5,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
+import { FTUEProvider } from '../contexts/FTUEContext'
 import { LiveRegionProvider } from '../components/a11y/LiveRegion'
 import { SkipLink } from '../components/a11y/AccessibleElement'
 
@@ -43,9 +44,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <CalmModeProvider>
         <SimplifyModeProvider>
-          <LiveRegionProvider>
-            <RootBody>{children}</RootBody>
-          </LiveRegionProvider>
+          <FTUEProvider>
+            <LiveRegionProvider>
+              <RootBody>{children}</RootBody>
+            </LiveRegionProvider>
+          </FTUEProvider>
         </SimplifyModeProvider>
       </CalmModeProvider>
     </html>
