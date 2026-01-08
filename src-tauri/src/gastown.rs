@@ -337,6 +337,8 @@ struct BeadsIssue {
     title: String,
     status: String,
     #[serde(default)]
+    issue_type: Option<String>,
+    #[serde(default)]
     assignee: Option<String>,
     created_at: String,
     created_by: Option<String>,
@@ -347,55 +349,168 @@ struct BeadsIssue {
     close_reason: Option<String>,
 }
 
-/// Get activity feed from beads issues
+/// Find the beads directory, following redirect if present
+fn find_beads_dir() -> Option<std::path::PathBuf> {
+    // Try current directory first
+    let cwd = std::env::current_dir().ok()?;
+
+    // Look for .beads in current dir or parent dirs
+    let mut dir = cwd.as_path();
+    loop {
+        let beads_dir = dir.join(".beads");
+        if beads_dir.exists() {
+            // Check for redirect
+            let redirect_file = beads_dir.join("redirect");
+            if redirect_file.exists() {
+                if let Ok(redirect_path) = std::fs::read_to_string(&redirect_file) {
+                    let redirect_path = redirect_path.trim();
+                    // Handle relative redirects
+                    let target = if redirect_path.starts_with('/') {
+                        std::path::PathBuf::from(redirect_path)
+                    } else {
+                        beads_dir.join(redirect_path)
+                    };
+                    if target.exists() {
+                        return Some(target);
+                    }
+                }
+            }
+            return Some(beads_dir);
+        }
+
+        // Move up to parent
+        match dir.parent() {
+            Some(parent) => dir = parent,
+            None => break,
+        }
+    }
+
+    // Try ~/gt/.beads as fallback
+    if let Some(home) = dirs::home_dir() {
+        let gt_beads = home.join("gt").join(".beads");
+        if gt_beads.exists() {
+            return Some(gt_beads);
+        }
+    }
+
+    None
+}
+
+/// Get activity feed from beads issues.jsonl (direct file read)
 #[tauri::command]
 pub async fn get_activity_feed(limit: Option<usize>) -> Result<Vec<ActivityEvent>, String> {
     let max_events = limit.unwrap_or(50);
 
-    // Run bd list --json to get recent issues
-    let output = Command::new("bd")
-        .args(["list", "--json", "--limit", "100"])
-        .output()
-        .map_err(|e| format!("Failed to run bd list: {}", e))?;
+    // Find beads directory
+    let beads_dir = find_beads_dir()
+        .ok_or_else(|| "Could not find .beads directory".to_string())?;
 
-    if !output.status.success() {
-        return Err(format!("bd list failed: {}", String::from_utf8_lossy(&output.stderr)));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let issues: Vec<BeadsIssue> = serde_json::from_str(&stdout)
-        .map_err(|e| format!("Failed to parse bd output: {}", e))?;
+    // First try interactions.jsonl (preferred for real-time events)
+    let interactions_path = beads_dir.join("interactions.jsonl");
+    let issues_path = beads_dir.join("issues.jsonl");
 
     let mut events: Vec<ActivityEvent> = Vec::new();
 
-    for issue in issues {
-        // Add closed event if issue is closed
-        if issue.status == "closed" {
-            if let Some(closed_at) = &issue.closed_at {
+    // Read issues.jsonl to generate events
+    if issues_path.exists() {
+        let content = std::fs::read_to_string(&issues_path)
+            .map_err(|e| format!("Failed to read issues.jsonl: {}", e))?;
+
+        for line in content.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            let issue: BeadsIssue = match serde_json::from_str(line) {
+                Ok(i) => i,
+                Err(_) => continue, // Skip malformed lines
+            };
+
+            // Skip certain event types that clutter the feed
+            let issue_type = issue.issue_type.as_deref().unwrap_or("");
+            if issue_type == "event" {
+                continue; // Skip session-ended events etc
+            }
+
+            // Generate events from issue lifecycle
+
+            // 1. Closed event (most important - work completed)
+            if issue.status == "closed" {
+                if let Some(ref closed_at) = issue.closed_at {
+                    events.push(ActivityEvent {
+                        timestamp: closed_at.clone(),
+                        event_type: "closed".to_string(),
+                        actor: issue.assignee.clone().or_else(|| issue.created_by.clone()),
+                        target_id: issue.id.clone(),
+                        target_title: issue.title.clone(),
+                        details: issue.close_reason.clone(),
+                    });
+                }
+            }
+
+            // 2. Merged event (for merge-requests)
+            if issue_type == "merge-request" && issue.status == "closed" {
+                if let Some(ref closed_at) = issue.closed_at {
+                    events.push(ActivityEvent {
+                        timestamp: closed_at.clone(),
+                        event_type: "merged".to_string(),
+                        actor: Some("refinery".to_string()),
+                        target_id: issue.id.clone(),
+                        target_title: issue.title.clone(),
+                        details: None,
+                    });
+                }
+            }
+
+            // 3. Claimed event (when assigned)
+            if issue.assignee.is_some() && issue.status == "in_progress" {
                 events.push(ActivityEvent {
-                    timestamp: closed_at.clone(),
-                    event_type: "closed".to_string(),
+                    timestamp: issue.updated_at.clone(),
+                    event_type: "claimed".to_string(),
                     actor: issue.assignee.clone(),
                     target_id: issue.id.clone(),
                     target_title: issue.title.clone(),
-                    details: issue.close_reason.clone(),
+                    details: None,
                 });
             }
-        }
 
-        // Add created event
-        events.push(ActivityEvent {
-            timestamp: issue.created_at.clone(),
-            event_type: "created".to_string(),
-            actor: issue.created_by.clone(),
-            target_id: issue.id.clone(),
-            target_title: issue.title.clone(),
-            details: None,
-        });
+            // 4. Created event
+            events.push(ActivityEvent {
+                timestamp: issue.created_at.clone(),
+                event_type: "created".to_string(),
+                actor: issue.created_by.clone(),
+                target_id: issue.id.clone(),
+                target_title: issue.title.clone(),
+                details: None,
+            });
+        }
+    }
+
+    // Also check interactions.jsonl for additional events (if it has content)
+    if interactions_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&interactions_path) {
+            if !content.trim().is_empty() {
+                // Parse interactions.jsonl format if it exists
+                // Format: {"timestamp": "...", "type": "...", "actor": "...", "target": "...", "details": "..."}
+                for line in content.lines() {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    if let Ok(event) = serde_json::from_str::<ActivityEvent>(line) {
+                        events.push(event);
+                    }
+                }
+            }
+        }
     }
 
     // Sort by timestamp descending (most recent first)
     events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    // Deduplicate by (timestamp, event_type, target_id)
+    events.dedup_by(|a, b| {
+        a.timestamp == b.timestamp && a.event_type == b.event_type && a.target_id == b.target_id
+    });
 
     // Limit results
     events.truncate(max_events);
