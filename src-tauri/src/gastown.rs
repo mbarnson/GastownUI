@@ -318,3 +318,87 @@ pub async fn attach_tmux_session(session_name: String) -> Result<(), String> {
 
     Ok(())
 }
+
+// ===== Activity Feed =====
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityEvent {
+    pub timestamp: String,
+    pub event_type: String,      // "created", "closed", "updated", "merged", "claimed"
+    pub actor: Option<String>,   // Who did it
+    pub target_id: String,       // Issue ID
+    pub target_title: String,    // Issue title
+    pub details: Option<String>, // Extra info like close_reason
+}
+
+#[derive(Debug, Deserialize)]
+struct BeadsIssue {
+    id: String,
+    title: String,
+    status: String,
+    #[serde(default)]
+    assignee: Option<String>,
+    created_at: String,
+    created_by: Option<String>,
+    updated_at: String,
+    #[serde(default)]
+    closed_at: Option<String>,
+    #[serde(default)]
+    close_reason: Option<String>,
+}
+
+/// Get activity feed from beads issues
+#[tauri::command]
+pub async fn get_activity_feed(limit: Option<usize>) -> Result<Vec<ActivityEvent>, String> {
+    let max_events = limit.unwrap_or(50);
+
+    // Run bd list --json to get recent issues
+    let output = Command::new("bd")
+        .args(["list", "--json", "--limit", "100"])
+        .output()
+        .map_err(|e| format!("Failed to run bd list: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("bd list failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let issues: Vec<BeadsIssue> = serde_json::from_str(&stdout)
+        .map_err(|e| format!("Failed to parse bd output: {}", e))?;
+
+    let mut events: Vec<ActivityEvent> = Vec::new();
+
+    for issue in issues {
+        // Add closed event if issue is closed
+        if issue.status == "closed" {
+            if let Some(closed_at) = &issue.closed_at {
+                events.push(ActivityEvent {
+                    timestamp: closed_at.clone(),
+                    event_type: "closed".to_string(),
+                    actor: issue.assignee.clone(),
+                    target_id: issue.id.clone(),
+                    target_title: issue.title.clone(),
+                    details: issue.close_reason.clone(),
+                });
+            }
+        }
+
+        // Add created event
+        events.push(ActivityEvent {
+            timestamp: issue.created_at.clone(),
+            event_type: "created".to_string(),
+            actor: issue.created_by.clone(),
+            target_id: issue.id.clone(),
+            target_title: issue.title.clone(),
+            details: None,
+        });
+    }
+
+    // Sort by timestamp descending (most recent first)
+    events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    // Limit results
+    events.truncate(max_events);
+
+    Ok(events)
+}

@@ -32,6 +32,7 @@ pub fn run() {
             gastown::capture_tmux_pane,
             gastown::get_session_details,
             gastown::attach_tmux_session,
+            gastown::get_activity_feed,
             voice::start_voice_server,
             voice::stop_voice_server,
             voice::get_voice_server_status,

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
+import { ActivityFeed } from '../components/ActivityFeed'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import {
   Truck,
@@ -7,6 +8,7 @@ import {
   Circle,
   Activity,
   AlertTriangle,
+  Zap,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
@@ -124,6 +126,15 @@ function Dashboard() {
                   No ready work. The calm before the storm.
                 </div>
               )}
+            </section>
+
+            {/* Activity Feed */}
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-rose-400" />
+                Activity Feed
+              </h2>
+              <ActivityFeed limit={15} maxHeight="300px" />
             </section>
 
             {/* Tmux Sessions */}
