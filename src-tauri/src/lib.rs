@@ -24,6 +24,9 @@ pub fn run() {
             gastown::capture_tmux_pane,
             gastown::get_session_details,
             gastown::attach_tmux_session,
+            gastown::list_molecules,
+            gastown::get_molecule_details,
+            gastown::get_demo_molecule,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
