@@ -1,0 +1,33 @@
+// Android Signing Configuration Template
+// Copy this to src-tauri/gen/android/app/build.gradle.kts after `tauri android init`
+//
+// Add this inside the android {} block:
+
+android {
+    // ... existing config ...
+
+    signingConfigs {
+        create("release") {
+            val signingPropsFile = file("signing.properties")
+            if (signingPropsFile.exists()) {
+                val props = java.util.Properties()
+                props.load(signingPropsFile.inputStream())
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+}
