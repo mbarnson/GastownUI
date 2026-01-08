@@ -14,6 +14,7 @@ import { Route as MobileRouteImport } from './routes/mobile'
 import { Route as DesignRouteImport } from './routes/design'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WelcomeCompleteRouteImport } from './routes/welcome/complete'
 import { Route as RigRigIdRouteImport } from './routes/rig.$rigId'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
@@ -46,6 +47,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeCompleteRoute = WelcomeCompleteRouteImport.update({
+  id: '/welcome/complete',
+  path: '/welcome/complete',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RigRigIdRoute = RigRigIdRouteImport.update({
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/mobile': typeof MobileRoute
   '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
+  '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/mobile': typeof MobileRoute
   '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
+  '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/mobile': typeof MobileRoute
   '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
+  '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/mobile'
     | '/visionos'
     | '/rig/$rigId'
+    | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/mobile'
     | '/visionos'
     | '/rig/$rigId'
+    | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/mobile'
     | '/visionos'
     | '/rig/$rigId'
+    | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -190,6 +202,7 @@ export interface RootRouteChildren {
   MobileRoute: typeof MobileRoute
   VisionosRoute: typeof VisionosRoute
   RigRigIdRoute: typeof RigRigIdRoute
+  WelcomeCompleteRoute: typeof WelcomeCompleteRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
   DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome/complete': {
+      id: '/welcome/complete'
+      path: '/welcome/complete'
+      fullPath: '/welcome/complete'
+      preLoaderRoute: typeof WelcomeCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rig/$rigId': {
@@ -302,6 +322,7 @@ const rootRouteChildren: RootRouteChildren = {
   MobileRoute: MobileRoute,
   VisionosRoute: VisionosRoute,
   RigRigIdRoute: RigRigIdRoute,
+  WelcomeCompleteRoute: WelcomeCompleteRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoStartApiRequestRoute: DemoStartApiRequestRoute,
   DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,
