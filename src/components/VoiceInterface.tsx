@@ -133,6 +133,7 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     isProcessing,
     error: interactionError,
     streamVoice,
+    sendVoice,
   } = useVoiceInteraction();
 
   // Auto-scroll to bottom when new messages arrive

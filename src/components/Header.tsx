@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import CalmModeToggle from './a11y/CalmModeToggle'
+import SimplifyModeToggle from './a11y/SimplifyModeToggle'
 import { useConvoys, useTmuxSessions } from '../hooks/useGastown'
 import { useSidebarMode } from '../contexts/SidebarModeContext'
 
