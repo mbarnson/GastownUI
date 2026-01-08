@@ -1,22 +1,33 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
-import { ActivityFeed } from '../components/ActivityFeed'
+import { SelfTestPanel } from '../components/SelfTestPanel'
+import { TmuxPanel } from '../components/TmuxPanel'
+import { DeepQueryPanel } from '../components/DeepQueryPanel'
+import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
+import { useActiveMolecules } from '../hooks/useMolecule'
 import {
   Truck,
   Terminal,
   Circle,
   Activity,
   AlertTriangle,
-  Zap,
+  TestTube2,
+  Brain,
+  GitBranch,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
 
+type SidebarMode = 'voice' | 'selfTest' | 'deepQuery'
+
 function Dashboard() {
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('voice')
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
+  const { data: molecules } = useActiveMolecules()
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
@@ -41,6 +52,30 @@ function Dashboard() {
               <Terminal className="w-4 h-4" />
               <span>{sessions?.length || 0} Sessions</span>
             </div>
+            <button
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                sidebarMode === 'deepQuery'
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'hover:bg-slate-700'
+              }`}
+              onClick={() => setSidebarMode(sidebarMode === 'deepQuery' ? 'voice' : 'deepQuery')}
+              title="Deep Query - AI Analysis"
+            >
+              <Brain className="w-4 h-4" />
+              <span>Query</span>
+            </button>
+            <button
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                sidebarMode === 'selfTest'
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'hover:bg-slate-700'
+              }`}
+              onClick={() => setSidebarMode(sidebarMode === 'selfTest' ? 'voice' : 'selfTest')}
+              title="Voice Self-Test"
+            >
+              <TestTube2 className="w-4 h-4" />
+              <span>Self-Test</span>
+            </button>
           </div>
         </div>
       </header>
@@ -90,6 +125,28 @@ function Dashboard() {
               )}
             </section>
 
+            {/* Active Molecules (Workflows) */}
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <GitBranch className="w-5 h-5 text-purple-400" />
+                Active Workflows
+              </h2>
+              {molecules && molecules.length > 0 ? (
+                <div className="space-y-4">
+                  {molecules.map((mol) => (
+                    <MoleculeVisualizer key={mol.id} molecule={mol} compact />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-400 text-sm mb-4">
+                    No active workflows. Showing demo visualization:
+                  </p>
+                  <MoleculeVisualizer molecule={DEMO_MOLECULE} />
+                </div>
+              )}
+            </section>
+
             {/* Ready Work */}
             <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -128,56 +185,24 @@ function Dashboard() {
               )}
             </section>
 
-            {/* Activity Feed */}
-            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-rose-400" />
-                Activity Feed
-              </h2>
-              <ActivityFeed limit={15} maxHeight="300px" />
-            </section>
-
-            {/* Tmux Sessions */}
-            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Terminal className="w-5 h-5 text-amber-400" />
-                Active Sessions
-              </h2>
-              {sessions && sessions.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {sessions.map((session) => (
-                    <div
-                      key={session.name}
-                      className="bg-slate-900/50 rounded-lg p-3 border border-slate-600"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            session.attached ? 'bg-emerald-400' : 'bg-gray-500'
-                          }`}
-                        />
-                        <span className="text-white text-sm font-medium truncate">
-                          {session.name}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {session.windows} window{session.windows !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-gray-400 text-center py-4">
-                  No active tmux sessions
-                </div>
-              )}
-            </section>
+            {/* Tmux Sessions - Click to open terminal */}
+            <TmuxPanel />
           </div>
 
-          {/* Voice Interface sidebar */}
+          {/* Voice Interface / Self-Test / Deep Query sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-6 h-[calc(100vh-8rem)]">
-              <VoiceInterface />
+            <div className="sticky top-6 space-y-6">
+              {sidebarMode === 'selfTest' ? (
+                <SelfTestPanel />
+              ) : sidebarMode === 'deepQuery' ? (
+                <div className="h-[calc(100vh-8rem)]">
+                  <DeepQueryPanel />
+                </div>
+              ) : (
+                <div className="h-[calc(100vh-8rem)]">
+                  <VoiceInterface />
+                </div>
+              )}
             </div>
           </div>
         </div>

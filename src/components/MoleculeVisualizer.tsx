@@ -1,311 +1,364 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useEffect, useRef } from 'react';
 import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  type Node,
-  type Edge,
-  type NodeTypes,
-  Panel,
-  MarkerType,
-} from '@xyflow/react'
-import dagre from 'dagre'
-import '@xyflow/react/dist/style.css'
+  Molecule,
+  MoleculeStep,
+  getStepStatusColor,
+  getStepStatusIcon,
+} from '../hooks/useMolecule';
 
-import { useDemoMolecule } from '../hooks/useMolecule'
-import type { Molecule, MoleculeStep, StepStatus } from '../types/molecule'
-import { stepStatusColors } from '../types/molecule'
+interface MoleculeVisualizerProps {
+  molecule: Molecule;
+  compact?: boolean;
+}
 
-// Custom node component for molecule steps
-function StepNode({ data }: { data: MoleculeStep & { onClick: () => void } }) {
-  const colors = stepStatusColors[data.status]
+export function MoleculeVisualizer({ molecule, compact = false }: MoleculeVisualizerProps) {
+  const currentStepRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to current step
+  useEffect(() => {
+    if (currentStepRef.current && containerRef.current) {
+      currentStepRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [molecule.current_step]);
+
+  const completedSteps = molecule.steps.filter((s) => s.status === 'completed').length;
+  const totalSteps = molecule.steps.length;
+
+  return (
+    <div className="molecule-visualizer">
+      <div className="mol-header">
+        <div className="mol-title">
+          <h4>{molecule.name}</h4>
+          <span className="mol-id">{molecule.id}</span>
+        </div>
+        <div className="mol-progress">
+          <span className="progress-text">
+            {completedSteps}/{totalSteps} steps
+          </span>
+          <div className="progress-bar">
+            <div
+              className="progress-fill"
+              style={{ width: `${molecule.progress * 100}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {molecule.description && !compact && (
+        <p className="mol-description">{molecule.description}</p>
+      )}
+
+      <div className="steps-container" ref={containerRef}>
+        {molecule.steps.map((step, index) => (
+          <StepItem
+            key={step.id}
+            step={step}
+            isFirst={index === 0}
+            isLast={index === molecule.steps.length - 1}
+            isCurrent={step.id === molecule.current_step}
+            compact={compact}
+            ref={step.id === molecule.current_step ? currentStepRef : undefined}
+          />
+        ))}
+      </div>
+
+      <style>{`
+        .molecule-visualizer {
+          background: #1a1a2e;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .mol-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 16px;
+          background: #16213e;
+          border-bottom: 1px solid #0f3460;
+        }
+
+        .mol-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .mol-title h4 {
+          margin: 0;
+          color: #fff;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .mol-id {
+          color: #888;
+          font-size: 11px;
+          font-family: monospace;
+        }
+
+        .mol-progress {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .progress-text {
+          color: #888;
+          font-size: 12px;
+        }
+
+        .progress-bar {
+          width: 80px;
+          height: 4px;
+          background: #0f3460;
+          border-radius: 2px;
+          overflow: hidden;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: #4ecca3;
+          transition: width 0.3s ease;
+        }
+
+        .mol-description {
+          padding: 8px 16px;
+          margin: 0;
+          color: #888;
+          font-size: 12px;
+          border-bottom: 1px solid #0f3460;
+        }
+
+        .steps-container {
+          padding: 16px;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+interface StepItemProps {
+  step: MoleculeStep;
+  isFirst: boolean;
+  isLast: boolean;
+  isCurrent: boolean;
+  compact?: boolean;
+}
+
+const StepItem = ({
+  step,
+  isFirst,
+  isLast,
+  isCurrent,
+  compact,
+  ref,
+}: StepItemProps & { ref?: React.Ref<HTMLDivElement> }) => {
+  const statusColor = getStepStatusColor(step.status);
+  const statusIcon = getStepStatusIcon(step.status);
 
   return (
     <div
-      onClick={data.onClick}
-      className="px-4 py-3 rounded-lg shadow-lg cursor-pointer transition-all hover:scale-105 hover:shadow-xl min-w-[160px]"
-      style={{
-        backgroundColor: colors.bg,
-        borderColor: colors.border,
-        borderWidth: 2,
-        borderStyle: 'solid',
-        color: colors.text,
-      }}
+      ref={ref}
+      className={`step-item ${isCurrent ? 'current' : ''} ${step.status}`}
     >
-      <div className="font-semibold text-sm">{data.title}</div>
-      <div className="text-xs mt-1 opacity-80 capitalize">{data.status}</div>
-      {data.assignee && (
-        <div className="text-xs mt-1 opacity-70">@{data.assignee}</div>
-      )}
-    </div>
-  )
-}
-
-const nodeTypes: NodeTypes = {
-  step: StepNode,
-}
-
-// Layout nodes using dagre
-function getLayoutedElements(
-  nodes: Node[],
-  edges: Edge[],
-  direction = 'TB'
-): { nodes: Node[]; edges: Edge[] } {
-  const dagreGraph = new dagre.graphlib.Graph()
-  dagreGraph.setDefaultEdgeLabel(() => ({}))
-
-  const nodeWidth = 180
-  const nodeHeight = 80
-
-  dagreGraph.setGraph({ rankdir: direction, nodesep: 50, ranksep: 80 })
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight })
-  })
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target)
-  })
-
-  dagre.layout(dagreGraph)
-
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id)
-    return {
-      ...node,
-      position: {
-        x: nodeWithPosition.x - nodeWidth / 2,
-        y: nodeWithPosition.y - nodeHeight / 2,
-      },
-    }
-  })
-
-  return { nodes: layoutedNodes, edges }
-}
-
-// Convert molecule to React Flow nodes and edges
-function moleculeToFlow(
-  molecule: Molecule,
-  onStepClick: (step: MoleculeStep) => void
-): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = molecule.steps.map((step) => ({
-    id: step.id,
-    type: 'step',
-    position: { x: 0, y: 0 },
-    data: { ...step, onClick: () => onStepClick(step) },
-  }))
-
-  const edges: Edge[] = molecule.steps.flatMap((step) =>
-    step.depends_on.map((depId) => ({
-      id: `${depId}-${step.id}`,
-      source: depId,
-      target: step.id,
-      type: 'smoothstep',
-      animated: step.status === 'active',
-      style: { stroke: '#64748b', strokeWidth: 2 },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: '#64748b',
-      },
-    }))
-  )
-
-  return getLayoutedElements(nodes, edges)
-}
-
-// Step details panel
-function StepDetails({ step, onClose }: { step: MoleculeStep; onClose: () => void }) {
-  const colors = stepStatusColors[step.status]
-
-  return (
-    <div className="absolute right-4 top-4 w-80 bg-slate-800 rounded-lg shadow-xl border border-slate-700 overflow-hidden z-10">
-      <div
-        className="px-4 py-3 flex justify-between items-center"
-        style={{ backgroundColor: colors.bg }}
-      >
-        <h3 className="font-semibold text-white">{step.title}</h3>
-        <button
-          onClick={onClose}
-          className="text-white opacity-70 hover:opacity-100 text-xl leading-none"
+      <div className="step-connector">
+        {!isFirst && <div className="connector-line top" />}
+        <div
+          className="step-dot"
+          style={{ backgroundColor: statusColor, borderColor: statusColor }}
         >
-          ×
-        </button>
-      </div>
-      <div className="p-4 space-y-3">
-        <div>
-          <div className="text-xs text-slate-400 uppercase">Status</div>
-          <div className="text-slate-200 capitalize">{step.status}</div>
+          <span className="step-icon">{statusIcon}</span>
         </div>
-        {step.description && (
-          <div>
-            <div className="text-xs text-slate-400 uppercase">Description</div>
-            <div className="text-slate-200 text-sm">{step.description}</div>
-          </div>
+        {!isLast && <div className="connector-line bottom" />}
+      </div>
+      <div className="step-content">
+        <div className="step-header">
+          <span className="step-title">{step.title}</span>
+          {step.agent && (
+            <span className="step-agent">{step.agent}</span>
+          )}
+        </div>
+        {!compact && step.description && (
+          <p className="step-description">{step.description}</p>
         )}
-        {step.assignee && (
-          <div>
-            <div className="text-xs text-slate-400 uppercase">Assignee</div>
-            <div className="text-slate-200">@{step.assignee}</div>
-          </div>
+        {step.status === 'in_progress' && step.started_at && (
+          <span className="step-time">Started: {formatTime(step.started_at)}</span>
         )}
-        {step.depends_on.length > 0 && (
-          <div>
-            <div className="text-xs text-slate-400 uppercase">Dependencies</div>
-            <div className="text-slate-200 text-sm">
-              {step.depends_on.join(', ')}
-            </div>
-          </div>
-        )}
-        {step.started_at && (
-          <div>
-            <div className="text-xs text-slate-400 uppercase">Started</div>
-            <div className="text-slate-200 text-sm">
-              {new Date(step.started_at * 1000).toLocaleString()}
-            </div>
-          </div>
-        )}
-        {step.completed_at && (
-          <div>
-            <div className="text-xs text-slate-400 uppercase">Completed</div>
-            <div className="text-slate-200 text-sm">
-              {new Date(step.completed_at * 1000).toLocaleString()}
-            </div>
-          </div>
+        {step.status === 'completed' && step.completed_at && (
+          <span className="step-time">Completed: {formatTime(step.completed_at)}</span>
         )}
       </div>
+
+      <style>{`
+        .step-item {
+          display: flex;
+          gap: 12px;
+          position: relative;
+        }
+
+        .step-item.current {
+          background: rgba(249, 200, 70, 0.1);
+          margin: -8px;
+          padding: 8px;
+          border-radius: 6px;
+        }
+
+        .step-connector {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          width: 20px;
+          flex-shrink: 0;
+        }
+
+        .connector-line {
+          width: 2px;
+          flex: 1;
+          background: #0f3460;
+        }
+
+        .connector-line.top {
+          min-height: 8px;
+        }
+
+        .connector-line.bottom {
+          min-height: 8px;
+        }
+
+        .step-item.completed .connector-line {
+          background: #4ecca3;
+        }
+
+        .step-dot {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          border: 2px solid;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .step-icon {
+          font-size: 10px;
+          color: white;
+        }
+
+        .step-content {
+          flex: 1;
+          padding-bottom: 16px;
+        }
+
+        .step-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .step-title {
+          color: #fff;
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .step-item.completed .step-title {
+          color: #4ecca3;
+        }
+
+        .step-item.blocked .step-title {
+          color: #e94560;
+        }
+
+        .step-agent {
+          font-size: 11px;
+          color: #888;
+          padding: 2px 6px;
+          background: #0f3460;
+          border-radius: 4px;
+        }
+
+        .step-description {
+          margin: 4px 0 0 0;
+          color: #888;
+          font-size: 12px;
+        }
+
+        .step-time {
+          display: block;
+          margin-top: 4px;
+          color: #666;
+          font-size: 10px;
+        }
+      `}</style>
     </div>
-  )
+  );
+};
+
+function formatTime(timestamp: string): string {
+  try {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString();
+  } catch {
+    return timestamp;
+  }
 }
 
-// Legend component
-function Legend() {
-  return (
-    <div className="bg-slate-800/90 rounded-lg p-3 border border-slate-700">
-      <div className="text-xs text-slate-400 uppercase mb-2">Status Legend</div>
-      <div className="space-y-1">
-        {(Object.entries(stepStatusColors) as [StepStatus, typeof stepStatusColors[StepStatus]][]).map(
-          ([status, colors]) => (
-            <div key={status} className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded"
-                style={{ backgroundColor: colors.bg }}
-              />
-              <span className="text-xs text-slate-300 capitalize">{status}</span>
-            </div>
-          )
-        )}
-      </div>
-    </div>
-  )
-}
-
-export function MoleculeVisualizer() {
-  const { data: molecule, isLoading, error } = useDemoMolecule()
-  const [selectedStep, setSelectedStep] = useState<MoleculeStep | null>(null)
-
-  const { initialNodes, initialEdges } = useMemo(() => {
-    if (!molecule) return { initialNodes: [], initialEdges: [] }
-    const { nodes, edges } = moleculeToFlow(molecule, setSelectedStep)
-    return { initialNodes: nodes, initialEdges: edges }
-  }, [molecule])
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
-
-  // Update nodes/edges when molecule changes
-  useMemo(() => {
-    if (molecule) {
-      const { nodes: newNodes, edges: newEdges } = moleculeToFlow(
-        molecule,
-        setSelectedStep
-      )
-      setNodes(newNodes)
-      setEdges(newEdges)
-    }
-  }, [molecule, setNodes, setEdges])
-
-  const onPaneClick = useCallback(() => {
-    setSelectedStep(null)
-  }, [])
-
-  if (isLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-slate-400">
-        <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
-          Loading molecule...
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-red-400">
-        <div className="text-center">
-          <div className="text-2xl mb-2">⚠️</div>
-          Error loading molecule: {String(error)}
-        </div>
-      </div>
-    )
-  }
-
-  if (!molecule) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-slate-400">
-        No molecule data available
-      </div>
-    )
-  }
-
-  return (
-    <div className="h-screen w-full relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onPaneClick={onPaneClick}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
-        maxZoom={2}
-        className="bg-slate-900"
-      >
-        <Background color="#334155" gap={20} />
-        <Controls className="bg-slate-800 border-slate-700" />
-        <MiniMap
-          nodeColor={(node) => {
-            const status = (node.data as MoleculeStep).status
-            return stepStatusColors[status].bg
-          }}
-          className="bg-slate-800 border-slate-700"
-        />
-        <Panel position="top-left" className="m-4">
-          <div className="bg-slate-800/90 rounded-lg p-4 border border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-200">
-              {molecule.name}
-            </h2>
-            {molecule.description && (
-              <p className="text-sm text-slate-400 mt-1">{molecule.description}</p>
-            )}
-            <div className="text-xs text-slate-500 mt-2">
-              {molecule.steps.length} steps •{' '}
-              {molecule.steps.filter((s) => s.status === 'complete').length} complete
-            </div>
-          </div>
-        </Panel>
-        <Panel position="bottom-left" className="m-4">
-          <Legend />
-        </Panel>
-      </ReactFlow>
-      {selectedStep && (
-        <StepDetails step={selectedStep} onClose={() => setSelectedStep(null)} />
-      )}
-    </div>
-  )
-}
+// Demo molecule for when no real data is available
+export const DEMO_MOLECULE: Molecule = {
+  id: 'mol-demo',
+  name: 'Feature Implementation',
+  description: 'Example workflow showing molecule visualization',
+  progress: 0.4,
+  status: 'in_progress',
+  current_step: 'step-3',
+  steps: [
+    {
+      id: 'step-1',
+      title: 'Plan implementation',
+      description: 'Design the approach and identify files to modify',
+      status: 'completed',
+      completed_at: new Date(Date.now() - 3600000).toISOString(),
+      dependencies: [],
+    },
+    {
+      id: 'step-2',
+      title: 'Write backend code',
+      description: 'Implement Rust backend with Tauri commands',
+      status: 'completed',
+      completed_at: new Date(Date.now() - 1800000).toISOString(),
+      dependencies: ['step-1'],
+    },
+    {
+      id: 'step-3',
+      title: 'Build frontend component',
+      description: 'Create React component with hooks',
+      status: 'in_progress',
+      agent: 'nux',
+      started_at: new Date(Date.now() - 600000).toISOString(),
+      dependencies: ['step-2'],
+    },
+    {
+      id: 'step-4',
+      title: 'Integration testing',
+      description: 'Test end-to-end functionality',
+      status: 'pending',
+      dependencies: ['step-3'],
+    },
+    {
+      id: 'step-5',
+      title: 'Documentation',
+      description: 'Update docs and close issue',
+      status: 'pending',
+      dependencies: ['step-4'],
+    },
+  ],
+};

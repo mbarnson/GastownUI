@@ -1,34 +1,84 @@
-import { useQuery } from '@tanstack/react-query'
-import { invoke } from '@tauri-apps/api/core'
-import type { Molecule } from '../types/molecule'
+import { useQuery } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-export function useMolecules() {
+export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
+
+export interface MoleculeStep {
+  id: string;
+  title: string;
+  description?: string;
+  status: StepStatus;
+  agent?: string;
+  started_at?: string;
+  completed_at?: string;
+  dependencies: string[];
+}
+
+export interface Molecule {
+  id: string;
+  name: string;
+  description?: string;
+  steps: MoleculeStep[];
+  current_step?: string;
+  progress: number;
+  status: string;
+}
+
+/**
+ * Hook to get molecule progress for a specific issue
+ */
+export function useMoleculeProgress(issueId: string | undefined) {
   return useQuery({
-    queryKey: ['molecules'],
-    queryFn: async () => {
-      return invoke<Molecule[]>('list_molecules')
-    },
+    queryKey: ['molecule', 'progress', issueId],
+    queryFn: () => invoke<Molecule>('get_molecule_progress', { issueId }),
+    enabled: !!issueId,
     refetchInterval: 5000,
-  })
+  });
 }
 
-export function useMolecule(id: string | null) {
+/**
+ * Hook to list all active molecules
+ */
+export function useActiveMolecules() {
   return useQuery({
-    queryKey: ['molecule', id],
-    queryFn: async () => {
-      if (!id) return null
-      return invoke<Molecule>('get_molecule_details', { id })
-    },
-    enabled: !!id,
-    refetchInterval: 2000,
-  })
+    queryKey: ['molecules', 'active'],
+    queryFn: () => invoke<Molecule[]>('list_active_molecules'),
+    refetchInterval: 10000,
+  });
 }
 
-export function useDemoMolecule() {
-  return useQuery({
-    queryKey: ['demo-molecule'],
-    queryFn: async () => {
-      return invoke<Molecule>('get_demo_molecule')
-    },
-  })
+/**
+ * Get status color for a step
+ */
+export function getStepStatusColor(status: StepStatus): string {
+  switch (status) {
+    case 'completed':
+      return '#4ecca3';
+    case 'in_progress':
+      return '#f9c846';
+    case 'blocked':
+      return '#e94560';
+    case 'skipped':
+      return '#888';
+    default:
+      return '#0f3460';
+  }
+}
+
+/**
+ * Get status icon for a step
+ */
+export function getStepStatusIcon(status: StepStatus): string {
+  switch (status) {
+    case 'completed':
+      return '✓';
+    case 'in_progress':
+      return '●';
+    case 'blocked':
+      return '✕';
+    case 'skipped':
+      return '○';
+    default:
+      return '○';
+  }
 }
