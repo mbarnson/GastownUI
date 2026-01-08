@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import CalmModeToggle from './a11y/CalmModeToggle'
+import SimplifyModeToggle from './a11y/SimplifyModeToggle'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -244,8 +245,10 @@ export default function Header() {
         </nav>
 
         {/* Accessibility Settings */}
-        <div className="p-4 border-t border-gray-700">
+        <div className="p-4 border-t border-gray-700 space-y-3">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Accessibility</p>
           <CalmModeToggle showLabel={true} />
+          <SimplifyModeToggle showLabel={true} />
         </div>
       </aside>
     </>

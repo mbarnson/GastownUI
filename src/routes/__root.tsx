@@ -4,6 +4,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
+import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
 
 import appCss from '../styles.css?url'
 
@@ -39,7 +40,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <CalmModeProvider>
-        <RootBody>{children}</RootBody>
+        <SimplifyModeProvider>
+          <RootBody>{children}</RootBody>
+        </SimplifyModeProvider>
       </CalmModeProvider>
     </html>
   )
