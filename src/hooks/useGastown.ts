@@ -705,32 +705,6 @@ export function useSetupState() {
   })
 }
 
-// Re-export setup hooks for backwards compatibility
-export { useSetupStatus } from './useSetup'
-export type { DependencyInfo } from '../lib/setupDetector'
-
-// Stub hook for installing dependencies (TODO: implement with Tauri)
-export function useInstallDependency() {
-  return useMutation({
-    mutationFn: async ({ name }: { name: string }) => {
-      console.log(`Installing dependency: ${name}`)
-      // TODO: Implement actual installation via Tauri
-      return { success: true, name }
-    },
-  })
-}
-
-// Stub hook for creating workspace (TODO: implement with Tauri)
-export function useCreateWorkspace() {
-  return useMutation({
-    mutationFn: async ({ path }: { path: string }) => {
-      console.log(`Creating workspace at: ${path}`)
-      // TODO: Implement actual workspace creation via Tauri
-      return { success: true, path }
-    },
-  })
-}
-
 // Simple version comparison
 function compareVersions(a: string, b: string): number {
   const partsA = a.split('.').map(Number)

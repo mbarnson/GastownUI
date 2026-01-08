@@ -19,7 +19,6 @@ import { Route as DesignRouteImport } from './routes/design'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WelcomeCompleteRouteImport } from './routes/welcome/complete'
-import { Route as RigRigIdRouteImport } from './routes/rig.$rigId'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
 import { Route as DemoApiNamesRouteImport } from './routes/demo/api.names'
@@ -78,11 +77,6 @@ const WelcomeCompleteRoute = WelcomeCompleteRouteImport.update({
   path: '/welcome/complete',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RigRigIdRoute = RigRigIdRouteImport.update({
-  id: '/rig/$rigId',
-  path: '/rig/$rigId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
   id: '/demo/start/server-funcs',
   path: '/demo/start/server-funcs',
@@ -129,7 +123,6 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/visionos': typeof VisionosRoute
-  '/rig/$rigId': typeof RigRigIdRoute
   '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
@@ -149,7 +142,6 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/visionos': typeof VisionosRoute
-  '/rig/$rigId': typeof RigRigIdRoute
   '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
@@ -170,7 +162,6 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/visionos': typeof VisionosRoute
-  '/rig/$rigId': typeof RigRigIdRoute
   '/welcome/complete': typeof WelcomeCompleteRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
@@ -192,7 +183,6 @@ export interface FileRouteTypes {
     | '/setup'
     | '/tmux'
     | '/visionos'
-    | '/rig/$rigId'
     | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
@@ -212,7 +202,6 @@ export interface FileRouteTypes {
     | '/setup'
     | '/tmux'
     | '/visionos'
-    | '/rig/$rigId'
     | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
@@ -232,7 +221,6 @@ export interface FileRouteTypes {
     | '/setup'
     | '/tmux'
     | '/visionos'
-    | '/rig/$rigId'
     | '/welcome/complete'
     | '/demo/api/names'
     | '/demo/start/api-request'
@@ -253,7 +241,6 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   TmuxRoute: typeof TmuxRoute
   VisionosRoute: typeof VisionosRoute
-  RigRigIdRoute: typeof RigRigIdRoute
   WelcomeCompleteRoute: typeof WelcomeCompleteRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
@@ -336,13 +323,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WelcomeCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/rig/$rigId': {
-      id: '/rig/$rigId'
-      path: '/rig/$rigId'
-      fullPath: '/rig/$rigId'
-      preLoaderRoute: typeof RigRigIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/demo/start/server-funcs': {
       id: '/demo/start/server-funcs'
       path: '/demo/start/server-funcs'
@@ -405,7 +385,6 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   TmuxRoute: TmuxRoute,
   VisionosRoute: VisionosRoute,
-  RigRigIdRoute: RigRigIdRoute,
   WelcomeCompleteRoute: WelcomeCompleteRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoStartApiRequestRoute: DemoStartApiRequestRoute,
