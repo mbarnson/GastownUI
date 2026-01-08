@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Sparkles,
 } from 'lucide-react'
+import { useCalmMode } from '../../contexts/CalmModeContext'
 
 interface PathOption {
   id: string
@@ -33,21 +34,28 @@ export default function CompletionCelebration({
   onPathSelect,
   enableVoice = true,
 }: CompletionCelebrationProps) {
+  const { isCalm } = useCalmMode()
   const [showCheckmarks, setShowCheckmarks] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
   const [hoveredOption, setHoveredOption] = useState<string | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [spokenOption, setSpokenOption] = useState<string | null>(null)
 
-  // Animate checkmarks appearing
+  // Animate checkmarks appearing (instant in calm mode)
   useEffect(() => {
+    if (isCalm) {
+      // Show everything immediately in calm mode
+      setShowCheckmarks(true)
+      setShowOptions(true)
+      return
+    }
     const timer1 = setTimeout(() => setShowCheckmarks(true), 500)
     const timer2 = setTimeout(() => setShowOptions(true), 1500)
     return () => {
       clearTimeout(timer1)
       clearTimeout(timer2)
     }
-  }, [])
+  }, [isCalm])
 
   const pathOptions: PathOption[] = [
     {
@@ -148,8 +156,8 @@ export default function CompletionCelebration({
                 `}
               />
             </div>
-            {/* Sparkle effects */}
-            {showCheckmarks && (
+            {/* Sparkle effects (hidden in calm mode) */}
+            {showCheckmarks && !isCalm && (
               <>
                 <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-yellow-400 animate-pulse" />
                 <Sparkles className="absolute -bottom-1 -left-3 w-5 h-5 text-cyan-400 animate-pulse delay-100" />

@@ -3,6 +3,7 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import Header from '../components/Header'
+import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 
 import appCss from '../styles.css?url'
 
@@ -17,7 +18,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'GastownUI - Gas Town Control Center',
+        title: 'GastownUI - Gas Town Dashboard',
       },
     ],
     links: [
@@ -37,26 +38,32 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
-        {/* Skip to main content link for keyboard users */}
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
-        <Header />
-        {children}
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
-        <Scripts />
-      </body>
+      <CalmModeProvider>
+        <RootBody>{children}</RootBody>
+      </CalmModeProvider>
     </html>
+  )
+}
+
+function RootBody({ children }: { children: React.ReactNode }) {
+  const { isCalm } = useCalmMode()
+
+  return (
+    <body className={isCalm ? 'calm-mode' : ''}>
+      <Header />
+      {children}
+      <TanStackDevtools
+        config={{
+          position: 'bottom-right',
+        }}
+        plugins={[
+          {
+            name: 'Tanstack Router',
+            render: <TanStackRouterDevtoolsPanel />,
+          },
+        ]}
+      />
+      <Scripts />
+    </body>
   )
 }

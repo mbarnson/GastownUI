@@ -86,3 +86,56 @@ textarea:focus-visible {
 [tabindex="-1"]:focus {
   outline: none;
 }
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Calm mode class - can be toggled manually */
+.calm-mode *,
+.calm-mode *::before,
+.calm-mode *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Motion-safe animations - only run when motion is allowed */
+.motion-safe-animate {
+  animation-play-state: running;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-animate {
+    animation-play-state: paused;
+    animation: none;
+  }
+}
+
+.calm-mode .motion-safe-animate {
+  animation-play-state: paused;
+  animation: none;
+}
+
+/* Fade-only transitions for reduced motion */
+.motion-reduce-fade {
+  transition: opacity 150ms ease-in-out !important;
+}
+
+/* Static progress indicator styles */
+.progress-static {
+  animation: none !important;
+}
+
+.progress-static::after {
+  content: none !important;
+}
