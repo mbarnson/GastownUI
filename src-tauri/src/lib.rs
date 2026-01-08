@@ -3,10 +3,12 @@ mod voice;
 mod self_test;
 mod instruct;
 mod setup;
+mod chunked_download;
 
 use voice::VoiceServerState;
 use self_test::SelfTestState;
 use instruct::InstructState;
+use chunked_download::DownloadManagerState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -17,6 +19,7 @@ pub fn run() {
         .manage(VoiceServerState::default())
         .manage(SelfTestState::default())
         .manage(InstructState::default())
+        .manage(DownloadManagerState::default())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -59,6 +62,12 @@ pub fn run() {
             setup::get_setup_status,
             setup::get_go_install_instructions,
             setup::get_beads_install_instructions,
+            chunked_download::start_chunked_download,
+            chunked_download::pause_download,
+            chunked_download::resume_download,
+            chunked_download::cancel_download,
+            chunked_download::get_download_status,
+            chunked_download::list_downloads,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
