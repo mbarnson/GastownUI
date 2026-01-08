@@ -41,7 +41,7 @@
       },
       "rpm": {
         "release": "1",
-        "epoch": "0"
+        "epoch": 0
       },
       "appimage": {
         "bundleMediaFramework": true
