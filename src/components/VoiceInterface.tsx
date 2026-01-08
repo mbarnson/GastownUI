@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useVoiceServer, useAudioRecorder, useVoiceInteraction } from '../hooks/useVoice';
+import {
+  parseActions,
+  executeActions,
+  extractNonActionText,
+  hasActions,
+  formatResultsForVoice,
+} from '../voice/actions';
 
 interface VoiceMessage {
   id: string;
@@ -63,6 +70,21 @@ export function VoiceInterface() {
 
       const response = await sendVoice(audio, 'interleaved');
 
+      // Check for ACTION: intents in model output
+      let responseText = response.text;
+      if (hasActions(response.text)) {
+        // Parse and execute actions
+        const actions = parseActions(response.text);
+        const results = await executeActions(actions);
+
+        // Extract non-action text for voice response
+        const nonActionText = extractNonActionText(response.text);
+        const actionFeedback = formatResultsForVoice(results);
+
+        // Combine non-action text with action feedback
+        responseText = [nonActionText, actionFeedback].filter(Boolean).join(' ');
+      }
+
       // Update user message with actual transcription and add assistant response
       setMessages((prev) => [
         ...prev.slice(0, -1),
@@ -70,7 +92,7 @@ export function VoiceInterface() {
         {
           id: crypto.randomUUID(),
           type: 'assistant',
-          text: response.text,
+          text: responseText,
           timestamp: new Date(),
         },
       ]);
