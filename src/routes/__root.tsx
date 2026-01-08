@@ -7,8 +7,11 @@ import { useEffect } from 'react'
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SidebarModeProvider } from '../contexts/SidebarModeContext'
-
-import appCss from '../styles.css?url'
+import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
+import { FTUEProvider } from '../contexts/FTUEContext'
+import { AudioProvider } from '../components/ftue/AudioManager'
+import { LiveRegionProvider } from '../components/a11y/LiveRegion'
+import { SkipLink } from '../components/a11y/AccessibleElement'
 
 import appCss from '../styles.css?url'
 
@@ -54,7 +57,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <CalmModeProvider>
-        <RootBody>{children}</RootBody>
+        <SimplifyModeProvider>
+          <FTUEProvider>
+            <AudioProvider>
+              <LiveRegionProvider>
+                <RootBody>{children}</RootBody>
+              </LiveRegionProvider>
+            </AudioProvider>
+          </FTUEProvider>
+        </SimplifyModeProvider>
       </CalmModeProvider>
     </html>
   )

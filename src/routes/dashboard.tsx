@@ -63,7 +63,7 @@ function Dashboard() {
     })
   }
 
-  // Initialize VoiceOver announcer system
+// Initialize VoiceOver announcer system
   useAnnouncerInit()
 
   // Announce convoy progress changes to screen readers
