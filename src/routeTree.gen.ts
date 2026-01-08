@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TmuxRouteImport } from './routes/tmux'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RigRigIdRouteImport } from './routes/rig/$rigId'
@@ -24,6 +25,11 @@ import { Route as DemoStartSsrDataOnlyRouteImport } from './routes/demo/start.ss
 const TmuxRoute = TmuxRouteImport.update({
   id: '/tmux',
   path: '/tmux',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -80,6 +86,7 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/rig/$rigId': typeof RigRigIdRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/rig/$rigId': typeof RigRigIdRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/rig/$rigId': typeof RigRigIdRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/setup'
     | '/tmux'
     | '/rig/$rigId'
     | '/demo/api/names'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/dashboard'
+    | '/setup'
     | '/tmux'
     | '/rig/$rigId'
     | '/demo/api/names'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/dashboard'
+    | '/setup'
     | '/tmux'
     | '/rig/$rigId'
     | '/demo/api/names'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
+  SetupRoute: typeof SetupRoute
   TmuxRoute: typeof TmuxRoute
   RigRigIdRoute: typeof RigRigIdRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/tmux'
       fullPath: '/tmux'
       preLoaderRoute: typeof TmuxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -258,6 +278,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
+  SetupRoute: SetupRoute,
   TmuxRoute: TmuxRoute,
   RigRigIdRoute: RigRigIdRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,

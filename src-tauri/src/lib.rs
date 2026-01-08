@@ -1,4 +1,5 @@
 mod gastown;
+mod setup;
 mod vision;
 mod voice;
 
@@ -43,6 +44,10 @@ pub fn run() {
             vision::get_vision_server_status,
             vision::describe_screen,
             vision::describe_image,
+            setup::check_dependencies,
+            setup::install_dependency,
+            setup::create_workspace,
+            setup::get_setup_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

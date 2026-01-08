@@ -557,3 +557,104 @@ export function useDescribeImage() {
     },
   })
 }
+
+// ============== FTUE Setup Integration ==============
+
+export interface DependencyInfo {
+  name: string
+  installed: boolean
+  version: string | null
+  path: string | null
+  install_url: string
+  install_instructions: string
+}
+
+export interface SetupStatus {
+  ready: boolean
+  dependencies: DependencyInfo[]
+  workspace_exists: boolean
+  workspace_path: string | null
+  missing_count: number
+  voice_guidance: string
+}
+
+export interface InstallResult {
+  success: boolean
+  message: string
+  next_step: string | null
+  voice_response: string
+}
+
+// Check all dependencies and workspace status
+export function useSetupStatus() {
+  return useQuery({
+    queryKey: ['setupStatus'],
+    queryFn: async (): Promise<SetupStatus> => {
+      if (!isTauri()) {
+        // Mock status for dev mode
+        return {
+          ready: false,
+          dependencies: [
+            { name: 'Git', installed: true, version: '2.39.0', path: '/usr/bin/git', install_url: '', install_instructions: '' },
+            { name: 'Go', installed: true, version: 'go1.21.5', path: '/usr/local/go/bin/go', install_url: '', install_instructions: '' },
+            { name: 'tmux', installed: true, version: 'tmux 3.3a', path: '/usr/local/bin/tmux', install_url: '', install_instructions: '' },
+            { name: 'gt (Gas Town CLI)', installed: false, version: null, path: null, install_url: 'https://github.com/txgsync/gastown', install_instructions: 'go install github.com/txgsync/gastown/cmd/gt@latest' },
+            { name: 'bd (Beads CLI)', installed: false, version: null, path: null, install_url: 'https://github.com/txgsync/beads', install_instructions: 'go install github.com/txgsync/beads/cmd/bd@latest' },
+          ],
+          workspace_exists: false,
+          workspace_path: null,
+          missing_count: 2,
+          voice_guidance: "You're missing gt and bd. The Gas Town tools need Go installed first, which you have. Say 'install gt' to continue.",
+        }
+      }
+      return invoke<SetupStatus>('get_setup_status')
+    },
+    staleTime: 30000, // Don't refetch too often
+    enabled: isBrowser,
+  })
+}
+
+// Install a specific dependency
+export function useInstallDependency() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (name: string): Promise<InstallResult> => {
+      if (!isTauri()) {
+        return {
+          success: true,
+          message: `Mock: ${name} installed`,
+          next_step: null,
+          voice_response: `Mock: ${name} has been installed successfully.`,
+        }
+      }
+      return invoke<InstallResult>('install_dependency', { name })
+    },
+    onSuccess: () => {
+      // Refresh setup status after installation
+      queryClient.invalidateQueries({ queryKey: ['setupStatus'] })
+    },
+  })
+}
+
+// Create a Gas Town workspace
+export function useCreateWorkspace() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (path?: string): Promise<InstallResult> => {
+      if (!isTauri()) {
+        return {
+          success: true,
+          message: 'Mock: Workspace created at ~/gt',
+          next_step: null,
+          voice_response: 'Mock: Your Gas Town workspace is ready!',
+        }
+      }
+      return invoke<InstallResult>('create_workspace', { path: path || null })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['setupStatus'] })
+    },
+  })
+}
