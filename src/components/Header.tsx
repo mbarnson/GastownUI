@@ -5,9 +5,12 @@ import {
   ChevronDown,
   ChevronRight,
   Factory,
+  Glasses,
   Home,
+  Layers,
   Menu,
   Network,
+  Smartphone,
   SquareFunction,
   StickyNote,
   Workflow,
@@ -95,6 +98,45 @@ export default function Header() {
           >
             <Workflow size={20} />
             <span className="font-medium">Design Mode</span>
+          </Link>
+
+          <Link
+            to="/mobile"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2',
+            }}
+          >
+            <Smartphone size={20} />
+            <span className="font-medium">Mobile Companion</span>
+          </Link>
+
+          <Link
+            to="/visionos"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-violet-600 hover:bg-violet-700 transition-colors mb-2',
+            }}
+          >
+            <Glasses size={20} />
+            <span className="font-medium">VisionOS Spatial</span>
+          </Link>
+
+          <Link
+            to="/rig/GastownUI"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-green-600 hover:bg-green-700 transition-colors mb-2',
+            }}
+          >
+            <Layers size={20} />
+            <span className="font-medium">Rig View (GastownUI)</span>
           </Link>
 
           {/* Demo Links Start */}
