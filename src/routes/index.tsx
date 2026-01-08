@@ -4,7 +4,9 @@ import { VoiceInterface } from '../components/VoiceInterface'
 import { SelfTestPanel } from '../components/SelfTestPanel'
 import { TmuxPanel } from '../components/TmuxPanel'
 import { DeepQueryPanel } from '../components/DeepQueryPanel'
+import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
+import { useActiveMolecules } from '../hooks/useMolecule'
 import {
   Truck,
   Terminal,
@@ -13,6 +15,7 @@ import {
   AlertTriangle,
   TestTube2,
   Brain,
+  GitBranch,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
@@ -24,6 +27,7 @@ function Dashboard() {
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
+  const { data: molecules } = useActiveMolecules()
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
@@ -117,6 +121,28 @@ function Dashboard() {
               ) : (
                 <div className="text-gray-400 text-center py-8">
                   No convoys rolling. Time to sling some work!
+                </div>
+              )}
+            </section>
+
+            {/* Active Molecules (Workflows) */}
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <GitBranch className="w-5 h-5 text-purple-400" />
+                Active Workflows
+              </h2>
+              {molecules && molecules.length > 0 ? (
+                <div className="space-y-4">
+                  {molecules.map((mol) => (
+                    <MoleculeVisualizer key={mol.id} molecule={mol} compact />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-400 text-sm mb-4">
+                    No active workflows. Showing demo visualization:
+                  </p>
+                  <MoleculeVisualizer molecule={DEMO_MOLECULE} />
                 </div>
               )}
             </section>

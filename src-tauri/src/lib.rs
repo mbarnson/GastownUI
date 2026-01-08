@@ -30,6 +30,8 @@ pub fn run() {
             gastown::run_gt_command,
             gastown::read_beads_file,
             gastown::list_tmux_sessions,
+            gastown::get_molecule_progress,
+            gastown::list_active_molecules,
             voice::start_voice_server,
             voice::stop_voice_server,
             voice::get_voice_server_status,
