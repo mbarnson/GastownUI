@@ -1,118 +1,192 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { VoiceInterface } from '../components/VoiceInterface'
+import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import {
-  Zap,
-  Server,
-  Route as RouteIcon,
-  Shield,
-  Waves,
-  Sparkles,
+  Truck,
+  Terminal,
+  Circle,
+  Activity,
+  AlertTriangle,
 } from 'lucide-react'
 
-export const Route = createFileRoute('/')({ component: App })
+export const Route = createFileRoute('/')({ component: Dashboard })
 
-function App() {
-  const features = [
-    {
-      icon: <Zap className="w-12 h-12 text-cyan-400" />,
-      title: 'Powerful Server Functions',
-      description:
-        'Write server-side code that seamlessly integrates with your client components. Type-safe, secure, and simple.',
-    },
-    {
-      icon: <Server className="w-12 h-12 text-cyan-400" />,
-      title: 'Flexible Server Side Rendering',
-      description:
-        'Full-document SSR, streaming, and progressive enhancement out of the box. Control exactly what renders where.',
-    },
-    {
-      icon: <RouteIcon className="w-12 h-12 text-cyan-400" />,
-      title: 'API Routes',
-      description:
-        'Build type-safe API endpoints alongside your application. No separate backend needed.',
-    },
-    {
-      icon: <Shield className="w-12 h-12 text-cyan-400" />,
-      title: 'Strongly Typed Everything',
-      description:
-        'End-to-end type safety from server to client. Catch errors before they reach production.',
-    },
-    {
-      icon: <Waves className="w-12 h-12 text-cyan-400" />,
-      title: 'Full Streaming Support',
-      description:
-        'Stream data from server to client progressively. Perfect for AI applications and real-time updates.',
-    },
-    {
-      icon: <Sparkles className="w-12 h-12 text-cyan-400" />,
-      title: 'Next Generation Ready',
-      description:
-        'Built from the ground up for modern web applications. Deploy anywhere JavaScript runs.',
-    },
-  ]
+function Dashboard() {
+  const { data: convoys, isLoading: convoysLoading } = useConvoys()
+  const { data: sessions } = useTmuxSessions()
+  const { data: readyBeads } = useBeads(undefined, 'open')
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      <section className="relative py-20 px-6 text-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10"></div>
-        <div className="relative max-w-5xl mx-auto">
-          <div className="flex items-center justify-center gap-6 mb-6">
-            <img
-              src="/tanstack-circle-logo.png"
-              alt="TanStack Logo"
-              className="w-24 h-24 md:w-32 md:h-32"
-            />
-            <h1 className="text-6xl md:text-7xl font-black text-white [letter-spacing:-0.08em]">
-              <span className="text-gray-300">TANSTACK</span>{' '}
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                START
-              </span>
+      {/* Header */}
+      <header className="border-b border-slate-700 bg-slate-900/50 backdrop-blur">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-black text-white">
+              <span className="text-gray-400">GAS</span>{' '}
+              <span className="text-rose-500">TOWN</span>
             </h1>
+            <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded">
+              Active
+            </span>
           </div>
-          <p className="text-2xl md:text-3xl text-gray-300 mb-4 font-light">
-            The framework for next generation AI applications
-          </p>
-          <p className="text-lg text-gray-400 max-w-3xl mx-auto mb-8">
-            Full-stack framework powered by TanStack Router for React and Solid.
-            Build modern applications with server functions, streaming, and type
-            safety.
-          </p>
-          <div className="flex flex-col items-center gap-4">
-            <a
-              href="https://tanstack.com/start"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-cyan-500/50"
-            >
-              Documentation
-            </a>
-            <p className="text-gray-400 text-sm mt-2">
-              Begin your TanStack Start journey by editing{' '}
-              <code className="px-2 py-1 bg-slate-700 rounded text-cyan-400">
-                /src/routes/index.tsx
-              </code>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 px-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10"
-            >
-              <div className="mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-semibold text-white mb-3">
-                {feature.title}
-              </h3>
-              <p className="text-gray-400 leading-relaxed">
-                {feature.description}
-              </p>
+          <div className="flex items-center gap-6 text-sm text-gray-400">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              <span>{convoys?.length || 0} Convoys</span>
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4" />
+              <span>{sessions?.length || 0} Sessions</span>
+            </div>
+          </div>
         </div>
-      </section>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main content area */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Convoys */}
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Truck className="w-5 h-5 text-rose-500" />
+                Convoys in Flight
+              </h2>
+              {convoysLoading ? (
+                <div className="text-gray-400">Loading...</div>
+              ) : convoys && convoys.length > 0 ? (
+                <div className="space-y-3">
+                  {convoys.map((convoy) => (
+                    <div
+                      key={convoy.id}
+                      className="bg-slate-900/50 rounded-lg p-4 border border-slate-600"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-medium">{convoy.name}</span>
+                        <span className="text-xs text-gray-400">{convoy.id}</span>
+                      </div>
+                      <div className="w-full bg-slate-700 rounded-full h-2">
+                        <div
+                          className="bg-rose-500 h-2 rounded-full transition-all"
+                          style={{ width: `${convoy.progress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
+                        <span>{convoy.status}</span>
+                        {convoy.polecats.length > 0 && (
+                          <span>{convoy.polecats.length} polecats</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-400 text-center py-8">
+                  No convoys rolling. Time to sling some work!
+                </div>
+              )}
+            </section>
+
+            {/* Ready Work */}
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Circle className="w-5 h-5 text-cyan-400" />
+                Ready Work
+              </h2>
+              {readyBeads && readyBeads.length > 0 ? (
+                <div className="space-y-2">
+                  {readyBeads.slice(0, 5).map((bead) => (
+                    <div
+                      key={bead.id}
+                      className="flex items-center justify-between py-2 border-b border-slate-700 last:border-0"
+                    >
+                      <div>
+                        <span className="text-white text-sm">{bead.title}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs px-2 py-0.5 bg-slate-700 rounded text-gray-400">
+                            {bead.type}
+                          </span>
+                          <span className="text-xs text-gray-500">P{bead.priority}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-400">{bead.id}</span>
+                    </div>
+                  ))}
+                  {readyBeads.length > 5 && (
+                    <div className="text-center text-xs text-gray-400 pt-2">
+                      +{readyBeads.length - 5} more items
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-gray-400 text-center py-4">
+                  No ready work. The calm before the storm.
+                </div>
+              )}
+            </section>
+
+            {/* Tmux Sessions */}
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Terminal className="w-5 h-5 text-amber-400" />
+                Active Sessions
+              </h2>
+              {sessions && sessions.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {sessions.map((session) => (
+                    <div
+                      key={session.name}
+                      className="bg-slate-900/50 rounded-lg p-3 border border-slate-600"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            session.attached ? 'bg-emerald-400' : 'bg-gray-500'
+                          }`}
+                        />
+                        <span className="text-white text-sm font-medium truncate">
+                          {session.name}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {session.windows} window{session.windows !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-400 text-center py-4">
+                  No active tmux sessions
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Voice Interface sidebar */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-6 h-[calc(100vh-8rem)]">
+              <VoiceInterface />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Emergency Stop */}
+      <div className="fixed bottom-6 right-6">
+        <button
+          className="p-4 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg shadow-red-600/30 transition-all hover:scale-105"
+          title="Emergency Stop All"
+          onClick={() => {
+            if (window.confirm('Stop ALL Gas Town agents? This cannot be undone.')) {
+              // TODO: Implement emergency stop
+              alert('Emergency stop not yet implemented')
+            }
+          }}
+        >
+          <AlertTriangle className="w-6 h-6" />
+        </button>
+      </div>
     </div>
   )
 }
