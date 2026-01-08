@@ -16,6 +16,8 @@ const queryClient = new QueryClient({
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
 import { SidebarModeProvider } from '../contexts/SidebarModeContext'
+import { FTUEProvider } from '../contexts/FTUEContext'
+import { LiveRegionProvider } from '../components/a11y/LiveRegion'
 import SkipLink from '../components/SkipLink'
 import VoiceControlOverlay from '../components/VoiceControlOverlay'
 
@@ -56,7 +58,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <CalmModeProvider>
           <SimplifyModeProvider>
             <SidebarModeProvider>
-              <RootBody>{children}</RootBody>
+              <FTUEProvider>
+                <LiveRegionProvider>
+                  <RootBody>{children}</RootBody>
+                </LiveRegionProvider>
+              </FTUEProvider>
             </SidebarModeProvider>
           </SimplifyModeProvider>
         </CalmModeProvider>
