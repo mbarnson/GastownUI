@@ -175,10 +175,36 @@ function ftueReducerCore(state: FTUEState, action: FTUEAction): FTUEState {
       }
     }
 
+    case 'SET_RIG_URL': {
+      return {
+        ...state,
+        firstRigUrl: action.url,
+      }
+    }
+
+    case 'RIG_ADDED': {
+      const newSetupState = {
+        ...state.setupState,
+        workspaceRigs: [...(state.setupState.workspaceRigs || []), action.rigName],
+      }
+      return {
+        ...state,
+        setupState: newSetupState,
+        step: 'complete',
+      }
+    }
+
     case 'START_MAYOR': {
       return {
         ...state,
         step: 'start_mayor',
+      }
+    }
+
+    case 'MAYOR_STARTED': {
+      return {
+        ...state,
+        step: 'complete',
       }
     }
 

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useReducer, useEffect, useMemo, useCallback } from 'react'
+import React, { useReducer, useEffect, useMemo, useCallback, useState } from 'react'
 import {
   ftueReducer,
   createInitialState,
@@ -63,6 +63,41 @@ function FTUEPage() {
       detector.stopPolling()
     }
   }, [state.step, detector])
+
+  // Handle workspace creation
+  useEffect(() => {
+    if (state.step === 'creating_workspace' && state.customPath) {
+      detector.createWorkspace(state.customPath).then(result => {
+        if (result.success) {
+          dispatch({ type: 'WORKSPACE_CREATED', path: state.customPath! })
+        } else {
+          dispatch({ type: 'ERROR', error: result.error || 'Failed to create workspace' })
+        }
+      })
+    }
+  }, [state.step, state.customPath, detector])
+
+  // Handle add first rig
+  const handleAddRig = useCallback(async (gitUrl: string) => {
+    dispatch({ type: 'SET_RIG_URL', url: gitUrl })
+    const result = await detector.addRig(gitUrl)
+    if (result.success && result.rigName) {
+      dispatch({ type: 'RIG_ADDED', rigName: result.rigName })
+    } else {
+      dispatch({ type: 'ERROR', error: result.error || 'Failed to add rig' })
+    }
+  }, [detector])
+
+  // Handle start mayor
+  const handleStartMayor = useCallback(async () => {
+    dispatch({ type: 'START_MAYOR' })
+    const result = await detector.startMayor()
+    if (result.success) {
+      dispatch({ type: 'MAYOR_STARTED' })
+    } else {
+      dispatch({ type: 'ERROR', error: result.error || 'Failed to start mayor' })
+    }
+  }, [detector])
 
   // Navigation handlers
   const handleProceed = useCallback(() => {
@@ -176,12 +211,26 @@ function FTUEPage() {
     case 'complete':
       return (
         <CompletionScreen
-          workspacePath={state.setupState.workspacePath || '~/gt'}
+          workspacePath={state.setupState.workspacePath || state.customPath || '~/gt'}
+          rigCount={state.setupState.workspaceRigs?.length || 0}
           onAddRig={() => dispatch({ type: 'START_ADD_RIG' })}
-          onStartMayor={() => dispatch({ type: 'START_MAYOR' })}
+          onStartMayor={handleStartMayor}
           onDashboard={handleGoToDashboard}
         />
       )
+
+    case 'add_first_rig':
+      return (
+        <AddRigStep
+          state={state}
+          onAddRig={handleAddRig}
+          onSkip={handleGoToDashboard}
+          onToggleVoice={handleToggleVoice}
+        />
+      )
+
+    case 'start_mayor':
+      return <LoadingScreen message="Starting the Mayor..." />
 
     case 'skipped':
       return (
@@ -321,14 +370,95 @@ function WorkspaceConfigStep({
   )
 }
 
+/** Add first rig step */
+function AddRigStep({
+  state,
+  onAddRig,
+  onSkip,
+  onToggleVoice,
+}: {
+  state: FTUEState
+  onAddRig: (url: string) => void
+  onSkip: () => void
+  onToggleVoice: () => void
+}) {
+  const [gitUrl, setGitUrl] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!gitUrl.trim()) return
+    setIsAdding(true)
+    await onAddRig(gitUrl.trim())
+    setIsAdding(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
+        <Logo size="md" />
+
+        <div className="text-center max-w-lg">
+          <h2 className="text-2xl font-bold text-slate-100 mb-2">Add Your First Project</h2>
+          <p className="text-slate-400">
+            Add a Git repository as your first rig. This is the project your agents will work on.
+          </p>
+        </div>
+
+        <div className="w-full max-w-md bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Git Repository URL
+          </label>
+          <input
+            type="text"
+            value={gitUrl}
+            onChange={(e) => setGitUrl(e.target.value)}
+            placeholder="https://github.com/username/repo.git"
+            className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="mt-2 text-xs text-slate-500">
+            You can also use GitHub shorthand: username/repo
+          </p>
+
+          {state.lastError && (
+            <div className="mt-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300">
+              {state.lastError}
+            </div>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            disabled={!gitUrl.trim() || isAdding}
+            className="mt-4 w-full px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+          >
+            {isAdding ? 'Adding...' : 'Add Project'}
+          </button>
+        </div>
+
+        <MicrophoneIndicator enabled={state.voiceEnabled} onToggle={onToggleVoice} />
+      </main>
+
+      <footer className="px-6 py-4 flex justify-center">
+        <button
+          onClick={onSkip}
+          className="text-sm text-slate-500 hover:text-slate-400 transition-colors"
+        >
+          Skip for now
+        </button>
+      </footer>
+    </div>
+  )
+}
+
 /** Completion screen */
 function CompletionScreen({
   workspacePath,
+  rigCount,
   onAddRig,
   onStartMayor,
   onDashboard,
 }: {
   workspacePath: string
+  rigCount: number
   onAddRig: () => void
   onStartMayor: () => void
   onDashboard: () => void
@@ -341,6 +471,11 @@ function CompletionScreen({
         <p className="text-slate-400">
           Your Gas Town workspace is ready at <code className="text-blue-400">{workspacePath}</code>
         </p>
+        {rigCount > 0 && (
+          <p className="text-slate-500 mt-1">
+            {rigCount} project{rigCount > 1 ? 's' : ''} added
+          </p>
+        )}
       </div>
 
       <div className="w-full max-w-md bg-slate-800 rounded-xl p-6 border border-slate-700 space-y-3">
@@ -353,8 +488,10 @@ function CompletionScreen({
           <div className="flex items-center gap-3">
             <span className="text-2xl">🚀</span>
             <div>
-              <div className="font-medium text-slate-200 group-hover:text-white">Add a project</div>
-              <div className="text-sm text-slate-400">Add a Git repo as your first rig</div>
+              <div className="font-medium text-slate-200 group-hover:text-white">
+                {rigCount > 0 ? 'Add another project' : 'Add a project'}
+              </div>
+              <div className="text-sm text-slate-400">Add a Git repo as a rig</div>
             </div>
           </div>
         </button>

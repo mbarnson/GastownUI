@@ -266,6 +266,76 @@ export class SetupDetector {
     }
     this.polling = false
   }
+
+  /** Create a new Gas Town workspace */
+  async createWorkspace(path: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Expand ~ to home directory
+      let resolvedPath = path
+      if (path.startsWith('~/')) {
+        const home = await homeDir()
+        resolvedPath = await join(home, path.slice(2))
+      }
+
+      // Run gt install to create the workspace
+      const result = await runCommand('gt', ['install', resolvedPath])
+
+      // Check if workspace was created successfully
+      if (await this.isWorkspace(resolvedPath)) {
+        return { success: true }
+      }
+
+      return {
+        success: false,
+        error: result.stderr || 'Workspace creation failed'
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error creating workspace'
+      }
+    }
+  }
+
+  /** Add a rig (Git repository) to the workspace */
+  async addRig(gitUrl: string): Promise<{ success: boolean; rigName?: string; error?: string }> {
+    try {
+      // Parse rig name from URL
+      const rigName = gitUrl.split('/').pop()?.replace('.git', '') || 'project'
+
+      // Run gt rig add
+      const result = await runCommand('gt', ['rig', 'add', rigName, gitUrl])
+
+      if (result.stderr && result.stderr.toLowerCase().includes('error')) {
+        return { success: false, error: result.stderr }
+      }
+
+      return { success: true, rigName }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error adding rig'
+      }
+    }
+  }
+
+  /** Start the Mayor agent */
+  async startMayor(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await runCommand('gt', ['mayor', 'start'])
+
+      if (result.stderr && result.stderr.toLowerCase().includes('error')) {
+        return { success: false, error: result.stderr }
+      }
+
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error starting mayor'
+      }
+    }
+  }
 }
 
 /** Singleton instance */

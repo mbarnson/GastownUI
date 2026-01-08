@@ -91,7 +91,10 @@ export type FTUEAction =
   | { type: 'TOGGLE_VOICE' }
   | { type: 'VOICE_RESPONSE'; response: string }
   | { type: 'START_ADD_RIG' }
+  | { type: 'SET_RIG_URL'; url: string }
+  | { type: 'RIG_ADDED'; rigName: string }
   | { type: 'START_MAYOR' }
+  | { type: 'MAYOR_STARTED' }
   | { type: 'GO_DASHBOARD' }
 
 /** Checklist item for UI */
