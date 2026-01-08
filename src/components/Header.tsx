@@ -10,6 +10,7 @@ import {
   Network,
   SquareFunction,
   StickyNote,
+  Workflow,
   X,
 } from 'lucide-react'
 
@@ -81,6 +82,19 @@ export default function Header() {
           >
             <Factory size={20} />
             <span className="font-medium">Gas Town Dashboard</span>
+          </Link>
+
+          <Link
+            to="/design"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors mb-2',
+            }}
+          >
+            <Workflow size={20} />
+            <span className="font-medium">Design Mode</span>
           </Link>
 
           {/* Demo Links Start */}
