@@ -6,6 +6,7 @@ import { TmuxPanel } from '../components/TmuxPanel'
 import { DeepQueryPanel } from '../components/DeepQueryPanel'
 import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
 import { SetupBanner } from '../components/SetupBanner'
+import { ColorBlindSettings } from '../components/ColorBlindSettings'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
 import { useSetupStatus, isSetupComplete } from '../hooks/useSetup'
@@ -19,6 +20,7 @@ import {
   TestTube2,
   Brain,
   GitBranch,
+  Eye,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
@@ -95,6 +97,8 @@ function Dashboard() {
               <TestTube2 className="w-4 h-4" />
               <span>Self-Test</span>
             </button>
+            <div className="border-l border-slate-600 h-4 mx-2" />
+            <ColorBlindSettings compact />
           </div>
         </div>
       </header>
