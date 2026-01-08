@@ -11,7 +11,9 @@ import {
   SetupChecklist,
   Logo,
   MicrophoneIndicator,
+  VoiceScriptDisplay,
   getChecklistFromSetup,
+  getVoiceScript,
   useFTUEVoice,
   type FTUEState,
 } from '../ftue'
@@ -113,7 +115,8 @@ function FTUEPage() {
       )
 
     case 'install_go':
-    case 'waiting_for_go':
+    case 'waiting_for_go': {
+      const goScript = getVoiceScript('install_go', state.setupState.platform)
       return (
         <InstallStep
           state={state}
@@ -122,6 +125,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
+          scriptText={goScript?.text}
         >
           <InstallInstructions
             platform={state.setupState.platform}
@@ -132,9 +136,11 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
+    }
 
     case 'install_beads':
-    case 'waiting_for_beads':
+    case 'waiting_for_beads': {
+      const beadsScript = getVoiceScript('install_beads')
       return (
         <InstallStep
           state={state}
@@ -143,6 +149,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
+          scriptText={beadsScript?.text}
         >
           <CommandBlock
             command="go install github.com/steveyegge/beads/cmd/bd@latest"
@@ -155,9 +162,11 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
+    }
 
     case 'install_gastown':
-    case 'waiting_for_gastown':
+    case 'waiting_for_gastown': {
+      const gtScript = getVoiceScript('install_gastown')
       return (
         <InstallStep
           state={state}
@@ -166,6 +175,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
+          scriptText={gtScript?.text}
         >
           <CommandBlock
             command="go install github.com/steveyegge/gastown/cmd/gt@latest"
@@ -178,8 +188,10 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
+    }
 
-    case 'configure_workspace':
+    case 'configure_workspace': {
+      const workspaceScript = getVoiceScript('configure_workspace')
       return (
         <WorkspaceConfigStep
           state={state}
@@ -187,8 +199,10 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
+          scriptText={workspaceScript?.text}
         />
       )
+    }
 
     case 'creating_workspace':
       return <LoadingScreen message="Creating your workspace..." />
@@ -234,6 +248,7 @@ function InstallStep({
   onToggleVoice,
   onSkip,
   isSpeaking = false,
+  scriptText,
 }: {
   state: FTUEState
   title: string
@@ -242,18 +257,28 @@ function InstallStep({
   onToggleVoice: () => void
   onSkip: () => void
   isSpeaking?: boolean
+  scriptText?: string
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-6">
         <Logo size="md" />
 
         <div className="text-center max-w-lg">
           <h2 className="text-2xl font-bold text-slate-100 mb-2">{title}</h2>
           <p className="text-slate-400">{description}</p>
         </div>
+
+        {/* Show voice script as text when voice is disabled */}
+        {scriptText && (
+          <VoiceScriptDisplay
+            text={scriptText}
+            voiceEnabled={state.voiceEnabled}
+            title="What to do"
+          />
+        )}
 
         <div className="w-full max-w-lg">
           {children}
@@ -287,12 +312,14 @@ function WorkspaceConfigStep({
   onToggleVoice,
   onSkip,
   isSpeaking = false,
+  scriptText,
 }: {
   state: FTUEState
   onConfigure: (path: string) => void
   onToggleVoice: () => void
   onSkip: () => void
   isSpeaking?: boolean
+  scriptText?: string
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
   const defaultPath = '~/gt'
@@ -308,6 +335,15 @@ function WorkspaceConfigStep({
             Your Gas Town workspace is where all your projects and agents will live.
           </p>
         </div>
+
+        {/* Show voice script as text when voice is disabled */}
+        {scriptText && (
+          <VoiceScriptDisplay
+            text={scriptText}
+            voiceEnabled={state.voiceEnabled}
+            title="What to do"
+          />
+        )}
 
         <div className="w-full max-w-md bg-slate-800 rounded-xl p-6 border border-slate-700">
           <label className="block text-sm font-medium text-slate-300 mb-2">
