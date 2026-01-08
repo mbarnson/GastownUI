@@ -1,9 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 
+export type FTUEStep = 'loading' | 'go-install' | 'beads-install' | 'complete';
+
 export interface SetupPreferences {
   voiceEnabled: boolean;
   setupSkipped: boolean;
-  lastStep: string | null;
+  setupDismissed: boolean; // User dismissed the setup warning banner
+  lastStep: FTUEStep | null;
+  completedSteps: FTUEStep[];
+  startedAt: string | null;
+  errors: string[];
 }
 
 const STORAGE_KEY = 'gastown_setup_prefs';
@@ -11,7 +17,11 @@ const STORAGE_KEY = 'gastown_setup_prefs';
 const defaultPreferences: SetupPreferences = {
   voiceEnabled: true,
   setupSkipped: false,
+  setupDismissed: false,
   lastStep: null,
+  completedSteps: [],
+  startedAt: null,
+  errors: [],
 };
 
 function loadPreferences(): SetupPreferences {
@@ -72,14 +82,62 @@ export function useSetupPreferences() {
     setPreferences({ setupSkipped: false });
   }, [setPreferences]);
 
-  const setLastStep = useCallback((step: string | null) => {
+  const setLastStep = useCallback((step: FTUEStep | null) => {
     setPreferences({ lastStep: step });
+  }, [setPreferences]);
+
+  const markStepComplete = useCallback((step: FTUEStep) => {
+    setPreferencesState((prev) => {
+      if (prev.completedSteps.includes(step)) return prev;
+      const newPrefs = {
+        ...prev,
+        completedSteps: [...prev.completedSteps, step],
+      };
+      savePreferences(newPrefs);
+      return newPrefs;
+    });
+  }, []);
+
+  const startSetup = useCallback(() => {
+    setPreferences({
+      startedAt: new Date().toISOString(),
+      setupSkipped: false,
+      setupDismissed: false,
+      lastStep: null,
+      completedSteps: [],
+      errors: [],
+    });
+  }, [setPreferences]);
+
+  const addError = useCallback((error: string) => {
+    setPreferencesState((prev) => {
+      const newPrefs = {
+        ...prev,
+        errors: [...prev.errors, error],
+      };
+      savePreferences(newPrefs);
+      return newPrefs;
+    });
+  }, []);
+
+  const dismissBanner = useCallback(() => {
+    setPreferences({ setupDismissed: true });
   }, [setPreferences]);
 
   const resetPreferences = useCallback(() => {
     setPreferencesState(defaultPreferences);
     savePreferences(defaultPreferences);
   }, []);
+
+  // Check if setup was interrupted (started but not completed)
+  const isInterrupted = preferences.startedAt !== null &&
+    preferences.lastStep !== null &&
+    preferences.lastStep !== 'complete' &&
+    !preferences.setupSkipped;
+
+  // Check if setup needs to be shown
+  const needsSetup = !preferences.setupSkipped &&
+    !preferences.completedSteps.includes('complete');
 
   return {
     preferences,
@@ -90,6 +148,12 @@ export function useSetupPreferences() {
     skipSetup,
     resetSkip,
     setLastStep,
+    markStepComplete,
+    startSetup,
+    addError,
+    dismissBanner,
     resetPreferences,
+    isInterrupted,
+    needsSetup,
   };
 }

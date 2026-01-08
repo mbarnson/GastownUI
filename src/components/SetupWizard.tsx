@@ -6,7 +6,7 @@ import {
   getCurrentSetupScene,
   SetupScene,
 } from '../hooks/useSetup';
-import { useSetupPreferences } from '../hooks/useSetupPreferences';
+import { useSetupPreferences, FTUEStep } from '../hooks/useSetupPreferences';
 import {
   CheckCircle,
   XCircle,
@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Volume2,
   VolumeX,
+  SkipForward,
 } from 'lucide-react';
 
 interface SetupWizardProps {
@@ -25,26 +26,59 @@ interface SetupWizardProps {
 
 export function SetupWizard({ onComplete }: SetupWizardProps) {
   const { data: status, isLoading, refetch } = useSetupStatus();
-  const { preferences, isLoaded, disableVoice, enableVoice, setLastStep } = useSetupPreferences();
+  const {
+    preferences,
+    isLoaded,
+    disableVoice,
+    enableVoice,
+    setLastStep,
+    markStepComplete,
+    startSetup,
+    skipSetup,
+    isInterrupted,
+  } = useSetupPreferences();
   const scene = getCurrentSetupScene(status, isLoading);
+
+  // Start setup tracking on first load
+  useEffect(() => {
+    if (isLoaded && !preferences.startedAt && scene !== 'complete') {
+      startSetup();
+    }
+  }, [isLoaded, preferences.startedAt, scene, startSetup]);
 
   // Track current step for resume capability
   useEffect(() => {
     if (scene !== 'loading' && scene !== 'complete') {
-      setLastStep(scene);
+      setLastStep(scene as FTUEStep);
     }
   }, [scene, setLastStep]);
+
+  // Mark completed steps
+  useEffect(() => {
+    if (status?.go.installed) {
+      markStepComplete('go-install');
+    }
+    if (status?.beads.installed) {
+      markStepComplete('beads-install');
+    }
+  }, [status, markStepComplete]);
 
   // Auto-advance when setup is complete
   useEffect(() => {
     if (scene === 'complete') {
+      markStepComplete('complete');
       setLastStep(null);
       const timer = setTimeout(onComplete, 1500);
       return () => clearTimeout(timer);
     }
-  }, [scene, onComplete, setLastStep]);
+  }, [scene, onComplete, setLastStep, markStepComplete]);
 
   const voiceEnabled = preferences.voiceEnabled;
+
+  const handleSkip = () => {
+    skipSetup();
+    onComplete();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
@@ -55,7 +89,16 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             <span className="text-gray-400">GAS</span>{' '}
             <span className="text-rose-500">TOWN</span>
           </h1>
-          <p className="text-gray-400">First-Time Setup</p>
+          <p className="text-gray-400">
+            {isInterrupted ? 'Resume Setup' : 'First-Time Setup'}
+          </p>
+
+          {/* Welcome back message for interrupted sessions */}
+          {isInterrupted && (
+            <p className="mt-2 text-sm text-amber-400">
+              Welcome back! Let's pick up where we left off.
+            </p>
+          )}
 
           {/* Voice mode toggle */}
           {isLoaded && scene !== 'complete' && (
@@ -105,6 +148,22 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           {scene === 'beads-install' && <BeadsInstallScene onRefresh={refetch} voiceEnabled={voiceEnabled} />}
           {scene === 'complete' && <CompleteScene />}
         </div>
+
+        {/* Skip setup option */}
+        {scene !== 'complete' && scene !== 'loading' && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={handleSkip}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              <SkipForward className="w-4 h-4" />
+              Skip setup for now
+            </button>
+            <p className="mt-1 text-xs text-gray-500">
+              You can complete setup later from the dashboard
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

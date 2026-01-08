@@ -5,9 +5,11 @@ import { SelfTestPanel } from '../components/SelfTestPanel'
 import { TmuxPanel } from '../components/TmuxPanel'
 import { DeepQueryPanel } from '../components/DeepQueryPanel'
 import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
+import { SetupBanner } from '../components/SetupBanner'
 import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
 import { useSetupStatus, isSetupComplete } from '../hooks/useSetup'
+import { useSetupPreferences } from '../hooks/useSetupPreferences'
 import {
   Truck,
   Terminal,
@@ -31,13 +33,20 @@ function Dashboard() {
   const { data: readyBeads } = useBeads(undefined, 'open')
   const { data: molecules } = useActiveMolecules()
   const { data: setupStatus, isLoading: setupLoading } = useSetupStatus()
+  const { preferences: setupPrefs, isLoaded: prefsLoaded } = useSetupPreferences()
 
-  // Redirect to setup if dependencies are missing
+  // Redirect to setup if dependencies are missing (unless setup was skipped)
   useEffect(() => {
-    if (!setupLoading && setupStatus && !isSetupComplete(setupStatus)) {
+    if (
+      !setupLoading &&
+      prefsLoaded &&
+      setupStatus &&
+      !isSetupComplete(setupStatus) &&
+      !setupPrefs.setupSkipped
+    ) {
       navigate({ to: '/setup' })
     }
-  }, [setupStatus, setupLoading, navigate])
+  }, [setupStatus, setupLoading, setupPrefs.setupSkipped, prefsLoaded, navigate])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
@@ -91,6 +100,9 @@ function Dashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Setup Banner - shown when setup was skipped or interrupted */}
+        <SetupBanner className="mb-6" />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main content area */}
           <div className="lg:col-span-2 space-y-6">
