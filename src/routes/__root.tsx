@@ -2,24 +2,22 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 import Header from '../components/Header'
+import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
+import { SidebarModeProvider } from '../contexts/SidebarModeContext'
+
+import appCss from '../styles.css?url'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5000,
       retry: 1,
+      refetchOnWindowFocus: true,
     },
   },
 })
-import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
-import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
-import { SidebarModeProvider } from '../contexts/SidebarModeContext'
-import SkipLink from '../components/SkipLink'
-import VoiceControlOverlay from '../components/VoiceControlOverlay'
-
-import appCss from '../styles.css?url'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -52,42 +50,42 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <QueryClientProvider client={queryClient}>
-        <CalmModeProvider>
-          <SimplifyModeProvider>
-            <SidebarModeProvider>
-              <RootBody>{children}</RootBody>
-            </SidebarModeProvider>
-          </SimplifyModeProvider>
-        </CalmModeProvider>
-      </QueryClientProvider>
+      <CalmModeProvider>
+        <RootBody>{children}</RootBody>
+      </CalmModeProvider>
     </html>
   )
 }
 
 function RootBody({ children }: { children: React.ReactNode }) {
   const { isCalm } = useCalmMode()
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual'
+    }
+    window.scrollTo(0, 0)
+  }, [])
 
   return (
     <body className={isCalm ? 'calm-mode' : ''}>
-      <SkipLink />
-      <Header />
-      <main id="main-content" tabIndex={-1} className="outline-none">
-        {children}
-      </main>
-      <VoiceControlOverlay />
-      <TanStackDevtools
-        config={{
-          position: 'bottom-right',
-        }}
-        plugins={[
-          {
-            name: 'Tanstack Router',
-            render: <TanStackRouterDevtoolsPanel />,
-          },
-        ]}
-      />
-      <Scripts />
+      <QueryClientProvider client={queryClient}>
+        <SidebarModeProvider>
+          <Header />
+          {children}
+          <TanStackDevtools
+            config={{
+              position: 'bottom-right',
+            }}
+            plugins={[
+              {
+                name: 'Tanstack Router',
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
+          <Scripts />
+        </SidebarModeProvider>
+      </QueryClientProvider>
     </body>
   )
 }
