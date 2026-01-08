@@ -309,17 +309,53 @@ export function useMergeQueue(rig: string) {
 }
 
 // Reorder merge queue items (drag and drop)
-export function useReorderMergeQueue(_rig: string) {
+// Uses bd update --priority to change the priority of merge-request beads
+// Lower priority number = higher in queue (P0 highest, P4 lowest)
+export function useReorderMergeQueue(rig: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ itemId, newPosition }: { itemId: string; newPosition: number }) => {
-      // TODO: Implement actual reorder command when gt supports it
-      // For now, this is a no-op placeholder
-      console.log(`Would reorder ${itemId} to position ${newPosition}`)
-      return { success: true }
+    mutationFn: async ({
+      itemId,
+      newPosition,
+      items,
+    }: {
+      itemId: string
+      newPosition: number
+      items: MergeQueueItem[]
+    }) => {
+      if (!isTauri()) {
+        // In browser mode, just return success for UI feedback
+        return { success: true, message: 'Mock reorder in browser mode' }
+      }
+
+      // Calculate new priority based on position
+      // Position 0 = P0 (highest), Position 4+ = P4 (lowest)
+      // We use position directly as priority (capped at 4)
+      const newPriority = Math.min(newPosition, 4)
+
+      // Find the bead ID from the item (strip any prefixes if needed)
+      const beadId = itemId
+
+      // Update the priority using bd update
+      const result = await runCommand('bd', [
+        'update',
+        beadId,
+        '--priority',
+        newPriority.toString(),
+      ])
+
+      if (result.exit_code !== 0) {
+        throw new Error(result.stderr || 'Failed to update merge queue priority')
+      }
+
+      return { success: true, newPriority }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mergeQueue'] })
+      // Invalidate merge queue to refetch with new order
+      queryClient.invalidateQueries({ queryKey: ['mergeQueue', rig] })
+    },
+    onError: (error) => {
+      console.error('Failed to reorder merge queue:', error)
     },
   })
 }

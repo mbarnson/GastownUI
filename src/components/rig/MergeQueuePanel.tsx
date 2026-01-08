@@ -82,8 +82,12 @@ export default function MergeQueuePanel({ items, rigId }: MergeQueuePanelProps) 
         item.position = idx + 1
       })
       setOrderedItems(newItems)
-      // Persist order change with optimistic updates
-      reorderMutation.mutate(newItems)
+      // Persist order change - update priority of dragged item based on new position
+      reorderMutation.mutate({
+        itemId: draggedItem,
+        newPosition: targetIdx,
+        items: newItems,
+      })
     }
     setDraggedItem(null)
   }
