@@ -1,4 +1,5 @@
 import { useColorBlindMode, ColorBlindMode, colorPalettes } from '../hooks/useColorBlindMode';
+import { useHaptics } from '../hooks/useHaptics';
 import { Eye, Palette, Check } from 'lucide-react';
 
 interface ColorBlindSettingsProps {
@@ -36,8 +37,24 @@ export function ColorBlindSettings({ compact = false }: ColorBlindSettingsProps)
     togglePatterns,
     toggleShapes,
   } = useColorBlindMode();
+  const { selection } = useHaptics();
 
   if (!isLoaded) return null;
+
+  const handleModeChange = (mode: ColorBlindMode) => {
+    selection(); // Light haptic on mode change
+    setMode(mode);
+  };
+
+  const handleTogglePatterns = () => {
+    selection();
+    togglePatterns();
+  };
+
+  const handleToggleShapes = () => {
+    selection();
+    toggleShapes();
+  };
 
   if (compact) {
     return (
@@ -45,7 +62,7 @@ export function ColorBlindSettings({ compact = false }: ColorBlindSettingsProps)
         <Eye className="w-4 h-4 text-gray-400" />
         <select
           value={preferences.mode}
-          onChange={(e) => setMode(e.target.value as ColorBlindMode)}
+          onChange={(e) => handleModeChange(e.target.value as ColorBlindMode)}
           className="bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600"
           aria-label="Color blind mode"
         >
@@ -76,7 +93,7 @@ export function ColorBlindSettings({ compact = false }: ColorBlindSettingsProps)
           return (
             <button
               key={mode}
-              onClick={() => setMode(mode)}
+              onClick={() => handleModeChange(mode)}
               className={`flex items-start gap-3 p-3 rounded-lg border transition-colors text-left ${
                 isSelected
                   ? 'border-rose-500 bg-rose-500/10'
@@ -123,7 +140,7 @@ export function ColorBlindSettings({ compact = false }: ColorBlindSettingsProps)
           <input
             type="checkbox"
             checked={preferences.useShapes}
-            onChange={toggleShapes}
+            onChange={handleToggleShapes}
             className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-rose-500 focus:ring-rose-500"
           />
           <span className="text-sm text-gray-300">
@@ -136,7 +153,7 @@ export function ColorBlindSettings({ compact = false }: ColorBlindSettingsProps)
           <input
             type="checkbox"
             checked={preferences.usePatterns}
-            onChange={togglePatterns}
+            onChange={handleTogglePatterns}
             className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-rose-500 focus:ring-rose-500"
           />
           <span className="text-sm text-gray-300">

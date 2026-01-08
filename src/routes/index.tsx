@@ -11,6 +11,7 @@ import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
 import { useSetupStatus, isSetupComplete } from '../hooks/useSetup'
 import { useSetupPreferences } from '../hooks/useSetupPreferences'
+import { useHaptics } from '../hooks/useHaptics'
 import {
   Truck,
   Terminal,
@@ -36,6 +37,7 @@ function Dashboard() {
   const { data: molecules } = useActiveMolecules()
   const { data: setupStatus, isLoading: setupLoading } = useSetupStatus()
   const { preferences: setupPrefs, isLoaded: prefsLoaded } = useSetupPreferences()
+  const { haptic, selection } = useHaptics()
 
   // Redirect to setup if dependencies are missing (unless setup was skipped)
   useEffect(() => {
@@ -79,7 +81,10 @@ function Dashboard() {
                   ? 'bg-emerald-500/20 text-emerald-400'
                   : 'hover:bg-slate-700'
               }`}
-              onClick={() => setSidebarMode(sidebarMode === 'deepQuery' ? 'voice' : 'deepQuery')}
+              onClick={() => {
+                selection()
+                setSidebarMode(sidebarMode === 'deepQuery' ? 'voice' : 'deepQuery')
+              }}
               title="Deep Query - AI Analysis"
             >
               <Brain className="w-4 h-4" />
@@ -91,7 +96,10 @@ function Dashboard() {
                   ? 'bg-amber-500/20 text-amber-400'
                   : 'hover:bg-slate-700'
               }`}
-              onClick={() => setSidebarMode(sidebarMode === 'selfTest' ? 'voice' : 'selfTest')}
+              onClick={() => {
+                selection()
+                setSidebarMode(sidebarMode === 'selfTest' ? 'voice' : 'selfTest')
+              }}
               title="Voice Self-Test"
             >
               <TestTube2 className="w-4 h-4" />
@@ -241,6 +249,7 @@ function Dashboard() {
           title="Emergency Stop All"
           aria-label="Emergency Stop All Gas Town agents"
           onClick={() => {
+            haptic('heavy') // Strong haptic for emergency action
             if (window.confirm('Stop ALL Gas Town agents? This cannot be undone.')) {
               // TODO: Implement emergency stop
               alert('Emergency stop not yet implemented')

@@ -7,6 +7,7 @@ import {
   SetupScene,
 } from '../hooks/useSetup';
 import { useSetupPreferences, FTUEStep } from '../hooks/useSetupPreferences';
+import { useHaptics } from '../hooks/useHaptics';
 import {
   CheckCircle,
   XCircle,
@@ -37,6 +38,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     skipSetup,
     isInterrupted,
   } = useSetupPreferences();
+  const { selection, warning } = useHaptics();
   const scene = getCurrentSetupScene(status, isLoading);
 
   // Start setup tracking on first load
@@ -76,8 +78,18 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const voiceEnabled = preferences.voiceEnabled;
 
   const handleSkip = () => {
+    warning(); // Warning haptic for skip action
     skipSetup();
     onComplete();
+  };
+
+  const handleVoiceToggle = () => {
+    selection(); // Light haptic on toggle
+    if (voiceEnabled) {
+      disableVoice();
+    } else {
+      enableVoice();
+    }
   };
 
   return (
@@ -103,7 +115,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           {/* Voice mode toggle */}
           {isLoaded && scene !== 'complete' && (
             <button
-              onClick={voiceEnabled ? disableVoice : enableVoice}
+              onClick={handleVoiceToggle}
               className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-colors ${
                 voiceEnabled
                   ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
@@ -223,11 +235,18 @@ function GoInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void; vo
   const { data: instructions, isLoading } = useGoInstructions();
   const { data: status } = useSetupStatus();
   const [copied, setCopied] = useState(false);
+  const { success, selection } = useHaptics();
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    success(); // Haptic feedback on copy
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRefresh = () => {
+    selection(); // Light haptic on button press
+    onRefresh();
   };
 
   // Extract the main command from instructions
@@ -325,7 +344,7 @@ function GoInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void; vo
           Download from go.dev
         </a>
         <button
-          onClick={onRefresh}
+          onClick={handleRefresh}
           className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
@@ -340,11 +359,18 @@ function BeadsInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void;
   const { data: instructions, isLoading } = useBeadsInstructions();
   const { data: status } = useSetupStatus();
   const [copied, setCopied] = useState(false);
+  const { success, selection } = useHaptics();
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    success(); // Haptic feedback on copy
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRefresh = () => {
+    selection(); // Light haptic on button press
+    onRefresh();
   };
 
   const mainCommand = 'go install github.com/steveyegge/beads/cmd/bd@latest';
@@ -443,7 +469,7 @@ function BeadsInstallScene({ onRefresh, voiceEnabled }: { onRefresh: () => void;
           Beads on GitHub
         </a>
         <button
-          onClick={onRefresh}
+          onClick={handleRefresh}
           className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
