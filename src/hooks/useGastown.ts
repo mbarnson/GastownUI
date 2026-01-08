@@ -333,38 +333,20 @@ export function useTownStatus() {
   })
 }
 
-// Activity event from backend
-export interface ActivityEvent {
-  timestamp: string
-  event_type: string  // "created", "closed", "updated", "merged", "claimed"
-  actor: string | null
-  target_id: string
-  target_title: string
-  details: string | null
-}
-
-// Activity feed - real-time event stream
-export function useActivityFeed(limit?: number) {
+// Activity feed
+export function useActivityFeed() {
   return useQuery({
-    queryKey: ['activity', limit],
-    queryFn: async (): Promise<ActivityEvent[]> => {
+    queryKey: ['activity'],
+    queryFn: async (): Promise<ActivityItem[]> => {
       if (!isTauri()) {
-        // Convert mock data to ActivityEvent format
-        return mockActivity.map((a) => ({
-          timestamp: a.timestamp,
-          event_type: a.type,
-          actor: a.actor || null,
-          target_id: a.bead_id || a.id,
-          target_title: a.message,
-          details: null,
-        }))
+        return mockActivity
       }
 
-      return invoke<ActivityEvent[]>('get_activity_feed', { limit: limit || 50 })
+      // TODO: Read from beads interactions.jsonl
+      return []
     },
     refetchInterval: 3000,
     staleTime: 1000,
-    enabled: isBrowser,
   })
 }
 
@@ -455,224 +437,85 @@ export function useUpdateBead() {
   })
 }
 
-// ============== Vision Integration ==============
-
-export interface VisionServerStatus {
-  running: boolean
-  ready: boolean
-  url: string
+// Setup state for FTUE banner
+export interface SetupState {
+  hasGo: boolean
+  hasBd: boolean
+  hasBdMinVersion: boolean
+  hasGt: boolean
+  hasGtMinVersion: boolean
+  hasWorkspace: boolean
+  workspacePath?: string
 }
 
-export interface VisionResponse {
-  description: string
-  latency_ms: number
-}
-
-export interface ScreenshotResult {
-  image_base64: string
-  width: number
-  height: number
-}
-
-// Check vision server status
-export function useVisionServerStatus() {
+// Check Gas Town setup state (for FTUE banner)
+export function useSetupState() {
   return useQuery({
-    queryKey: ['visionServerStatus'],
-    queryFn: async (): Promise<VisionServerStatus> => {
+    queryKey: ['setupState'],
+    queryFn: async (): Promise<SetupState> => {
       if (!isTauri()) {
-        return { running: false, ready: false, url: 'http://127.0.0.1:8081' }
+        // Return mock complete state in development
+        return {
+          hasGo: true,
+          hasBd: true,
+          hasBdMinVersion: true,
+          hasGt: true,
+          hasGtMinVersion: true,
+          hasWorkspace: true,
+          workspacePath: '~/gt',
+        }
       }
-      return invoke<VisionServerStatus>('get_vision_server_status')
+
+      // Check for bd and gt
+      const [bdResult, gtResult] = await Promise.all([
+        runCommand('bd', ['version']).catch(() => null),
+        runCommand('gt', ['version']).catch(() => null),
+      ])
+
+      const hasBd = bdResult?.exit_code === 0
+      const hasGt = gtResult?.exit_code === 0
+
+      // Parse versions
+      const bdVersion = bdResult?.stdout?.match(/bd version (\d+\.\d+\.\d+)/)?.[1]
+      const gtVersion = gtResult?.stdout?.match(/gt version (\d+\.\d+\.\d+)/)?.[1]
+
+      const hasBdMinVersion = bdVersion ? compareVersions(bdVersion, '0.43.0') >= 0 : false
+      const hasGtMinVersion = gtVersion ? compareVersions(gtVersion, '0.2.0') >= 0 : false
+
+      // Check workspace
+      let hasWorkspace = false
+      let workspacePath: string | undefined
+      if (hasGt) {
+        const statusResult = await runCommand('gt', ['status']).catch(() => null)
+        hasWorkspace = statusResult?.exit_code === 0
+        // Could parse workspace path from output if needed
+      }
+
+      return {
+        hasGo: true, // If bd/gt work, Go is installed
+        hasBd,
+        hasBdMinVersion,
+        hasGt,
+        hasGtMinVersion,
+        hasWorkspace,
+        workspacePath,
+      }
     },
-    refetchInterval: 5000,
-    staleTime: 2000,
+    staleTime: 60000, // Cache for 1 minute
     enabled: isBrowser,
   })
 }
 
-// Start vision server (on demand)
-export function useStartVisionServer() {
-  const queryClient = useQueryClient()
+// Simple version comparison
+function compareVersions(a: string, b: string): number {
+  const partsA = a.split('.').map(Number)
+  const partsB = b.split('.').map(Number)
 
-  return useMutation({
-    mutationFn: async (): Promise<VisionServerStatus> => {
-      if (!isTauri()) {
-        return { running: true, ready: true, url: 'http://127.0.0.1:8081' }
-      }
-      return invoke<VisionServerStatus>('start_vision_server', { config: null })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['visionServerStatus'] })
-    },
-  })
-}
-
-// Stop vision server
-export function useStopVisionServer() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (): Promise<void> => {
-      if (!isTauri()) {
-        return
-      }
-      return invoke<void>('stop_vision_server')
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['visionServerStatus'] })
-    },
-  })
-}
-
-// Capture screenshot only (without analysis)
-export function useCaptureScreenshot() {
-  return useMutation({
-    mutationFn: async (): Promise<ScreenshotResult> => {
-      if (!isTauri()) {
-        // Mock screenshot in dev
-        return {
-          image_base64: 'mock_base64_data',
-          width: 1920,
-          height: 1080,
-        }
-      }
-      return invoke<ScreenshotResult>('capture_screenshot')
-    },
-  })
-}
-
-// Describe screen - captures screenshot and analyzes it
-// This is the main "what am I looking at?" function
-export function useDescribeScreen() {
-  return useMutation({
-    mutationFn: async (customPrompt?: string): Promise<VisionResponse> => {
-      if (!isTauri()) {
-        // Mock response in dev
-        return {
-          description: 'Mock: You are looking at the GastownUI dashboard. It shows 2 active convoys, 3 polecats (2 active, 1 idle), and 5 open beads. The merge queue has 2 items pending.',
-          latency_ms: 1500,
-        }
-      }
-      return invoke<VisionResponse>('describe_screen', { customPrompt: customPrompt || null })
-    },
-  })
-}
-
-// Describe an arbitrary image
-export function useDescribeImage() {
-  return useMutation({
-    mutationFn: async ({ imageBase64, prompt }: { imageBase64: string; prompt?: string }): Promise<VisionResponse> => {
-      if (!isTauri()) {
-        return {
-          description: 'Mock: Image description not available in dev mode.',
-          latency_ms: 1000,
-        }
-      }
-      return invoke<VisionResponse>('describe_image', {
-        imageBase64,
-        prompt: prompt || null,
-      })
-    },
-  })
-}
-
-// ============== FTUE Setup Integration ==============
-
-export interface DependencyInfo {
-  name: string
-  installed: boolean
-  version: string | null
-  path: string | null
-  install_url: string
-  install_instructions: string
-}
-
-export interface SetupStatus {
-  ready: boolean
-  dependencies: DependencyInfo[]
-  workspace_exists: boolean
-  workspace_path: string | null
-  missing_count: number
-  voice_guidance: string
-}
-
-export interface InstallResult {
-  success: boolean
-  message: string
-  next_step: string | null
-  voice_response: string
-}
-
-// Check all dependencies and workspace status
-export function useSetupStatus() {
-  return useQuery({
-    queryKey: ['setupStatus'],
-    queryFn: async (): Promise<SetupStatus> => {
-      if (!isTauri()) {
-        // Mock status for dev mode
-        return {
-          ready: false,
-          dependencies: [
-            { name: 'Git', installed: true, version: '2.39.0', path: '/usr/bin/git', install_url: '', install_instructions: '' },
-            { name: 'Go', installed: true, version: 'go1.21.5', path: '/usr/local/go/bin/go', install_url: '', install_instructions: '' },
-            { name: 'tmux', installed: true, version: 'tmux 3.3a', path: '/usr/local/bin/tmux', install_url: '', install_instructions: '' },
-            { name: 'gt (Gas Town CLI)', installed: false, version: null, path: null, install_url: 'https://github.com/txgsync/gastown', install_instructions: 'go install github.com/txgsync/gastown/cmd/gt@latest' },
-            { name: 'bd (Beads CLI)', installed: false, version: null, path: null, install_url: 'https://github.com/txgsync/beads', install_instructions: 'go install github.com/txgsync/beads/cmd/bd@latest' },
-          ],
-          workspace_exists: false,
-          workspace_path: null,
-          missing_count: 2,
-          voice_guidance: "You're missing gt and bd. The Gas Town tools need Go installed first, which you have. Say 'install gt' to continue.",
-        }
-      }
-      return invoke<SetupStatus>('get_setup_status')
-    },
-    staleTime: 30000, // Don't refetch too often
-    enabled: isBrowser,
-  })
-}
-
-// Install a specific dependency
-export function useInstallDependency() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (name: string): Promise<InstallResult> => {
-      if (!isTauri()) {
-        return {
-          success: true,
-          message: `Mock: ${name} installed`,
-          next_step: null,
-          voice_response: `Mock: ${name} has been installed successfully.`,
-        }
-      }
-      return invoke<InstallResult>('install_dependency', { name })
-    },
-    onSuccess: () => {
-      // Refresh setup status after installation
-      queryClient.invalidateQueries({ queryKey: ['setupStatus'] })
-    },
-  })
-}
-
-// Create a Gas Town workspace
-export function useCreateWorkspace() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (path?: string): Promise<InstallResult> => {
-      if (!isTauri()) {
-        return {
-          success: true,
-          message: 'Mock: Workspace created at ~/gt',
-          next_step: null,
-          voice_response: 'Mock: Your Gas Town workspace is ready!',
-        }
-      }
-      return invoke<InstallResult>('create_workspace', { path: path || null })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['setupStatus'] })
-    },
-  })
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+    const numA = partsA[i] || 0
+    const numB = partsB[i] || 0
+    if (numA > numB) return 1
+    if (numA < numB) return -1
+  }
+  return 0
 }
