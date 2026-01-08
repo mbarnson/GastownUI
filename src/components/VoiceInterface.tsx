@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useVoiceServer, useAudioRecorder, useVoiceInteraction } from '../hooks/useVoice';
+import { useCurrentPersona, getPersonaStyle, type AgentPersona } from '../hooks/usePersona';
 
 interface VoiceMessage {
   id: string;
   type: 'user' | 'assistant';
   text: string;
   timestamp: Date;
+  persona?: AgentPersona;
 }
 
 export function VoiceInterface() {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [isHolding, setIsHolding] = useState(false);
+  const [showPersonaSelector, setShowPersonaSelector] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { status, isStarting, start, error: serverError } = useVoiceServer();
@@ -28,6 +31,14 @@ export function VoiceInterface() {
     error: interactionError,
     sendVoice,
   } = useVoiceInteraction();
+  const {
+    persona,
+    polecatName,
+    personaInfo,
+    personas,
+    setPersona,
+    setPolecatName,
+  } = useCurrentPersona();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -52,10 +63,14 @@ export function VoiceInterface() {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      const response = await sendVoice(audio, 'interleaved');
+      const response = await sendVoice(audio, {
+        mode: 'interleaved',
+        persona: persona,
+        polecatName: persona === 'polecat' ? polecatName || undefined : undefined,
+      });
 
       // Update user message with transcription (if available in future)
-      // and add assistant response
+      // and add assistant response with persona info
       setMessages((prev) => [
         ...prev.slice(0, -1),
         { ...userMessage, text: '(voice input)' },
@@ -64,6 +79,7 @@ export function VoiceInterface() {
           type: 'assistant',
           text: response.text,
           timestamp: new Date(),
+          persona: persona,
         },
       ]);
 
@@ -121,7 +137,17 @@ export function VoiceInterface() {
   return (
     <div className="voice-interface">
       <div className="voice-header">
-        <h3>Voice Assistant</h3>
+        <div className="voice-header-left">
+          <h3>Voice Assistant</h3>
+          <button
+            className={`persona-button ${getPersonaStyle(persona).bgColor}`}
+            onClick={() => setShowPersonaSelector(!showPersonaSelector)}
+            title="Change voice persona"
+          >
+            <span className="persona-icon">{getPersonaStyle(persona).icon}</span>
+            <span className="persona-name">{personaInfo?.name || 'Default'}</span>
+          </button>
+        </div>
         <div className="voice-status">
           {!status?.running ? (
             <button
@@ -138,6 +164,44 @@ export function VoiceInterface() {
           )}
         </div>
       </div>
+
+      {/* Persona Selector Dropdown */}
+      {showPersonaSelector && (
+        <div className="persona-selector">
+          <div className="persona-list">
+            {personas.map((p) => {
+              const style = getPersonaStyle(p.id);
+              return (
+                <button
+                  key={p.id}
+                  className={`persona-option ${persona === p.id ? 'selected' : ''}`}
+                  onClick={() => {
+                    setPersona(p.id);
+                    setShowPersonaSelector(false);
+                  }}
+                >
+                  <span className="persona-icon">{style.icon}</span>
+                  <div className="persona-info">
+                    <span className="persona-name">{p.name}</span>
+                    <span className="persona-desc">{p.description}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {persona === 'polecat' && (
+            <div className="polecat-name-input">
+              <label>Polecat Name:</label>
+              <input
+                type="text"
+                value={polecatName || ''}
+                onChange={(e) => setPolecatName(e.target.value || null)}
+                placeholder="e.g., Toast, Waffles, nux"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="voice-error">
@@ -221,11 +285,134 @@ export function VoiceInterface() {
           border-bottom: 1px solid #0f3460;
         }
 
+        .voice-header-left {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
         .voice-header h3 {
           margin: 0;
           color: #e94560;
           font-size: 14px;
           font-weight: 600;
+        }
+
+        .persona-button {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 8px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 11px;
+          transition: all 0.2s;
+        }
+
+        .persona-button:hover {
+          opacity: 0.8;
+        }
+
+        .persona-button .persona-icon {
+          font-size: 14px;
+        }
+
+        .persona-button .persona-name {
+          color: white;
+          font-weight: 500;
+        }
+
+        .persona-selector {
+          background: #16213e;
+          border-bottom: 1px solid #0f3460;
+          padding: 12px;
+        }
+
+        .persona-list {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 6px;
+        }
+
+        .persona-option {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          padding: 8px;
+          background: #0f3460;
+          border: 1px solid transparent;
+          border-radius: 6px;
+          cursor: pointer;
+          text-align: left;
+          transition: all 0.2s;
+        }
+
+        .persona-option:hover {
+          background: #1a4480;
+        }
+
+        .persona-option.selected {
+          border-color: #4ecca3;
+          background: rgba(78, 204, 163, 0.1);
+        }
+
+        .persona-option .persona-icon {
+          font-size: 18px;
+          flex-shrink: 0;
+        }
+
+        .persona-option .persona-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+        }
+
+        .persona-option .persona-name {
+          color: white;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .persona-option .persona-desc {
+          color: #888;
+          font-size: 10px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .polecat-name-input {
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 1px solid #0f3460;
+        }
+
+        .polecat-name-input label {
+          display: block;
+          color: #888;
+          font-size: 11px;
+          margin-bottom: 6px;
+        }
+
+        .polecat-name-input input {
+          width: 100%;
+          padding: 8px;
+          background: #0f3460;
+          border: 1px solid #1a4480;
+          border-radius: 4px;
+          color: white;
+          font-size: 12px;
+        }
+
+        .polecat-name-input input:focus {
+          outline: none;
+          border-color: #4ecca3;
+        }
+
+        .polecat-name-input input::placeholder {
+          color: #666;
         }
 
         .voice-status .status {

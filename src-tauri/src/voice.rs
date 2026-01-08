@@ -208,6 +208,93 @@ pub async fn get_voice_server_status(
 
 const SYSTEM_PROMPT_ASR: &str = "Perform ASR.";
 const SYSTEM_PROMPT_TTS: &str = "Perform TTS.";
+
+/// Agent persona types for Gas Town roles
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentPersona {
+    #[default]
+    Default,
+    Mayor,
+    Witness,
+    Refinery,
+    Deacon,
+    Polecat,
+    Crew,
+}
+
+/// Get the system prompt for a specific agent persona
+fn get_persona_prompt(persona: &AgentPersona, polecat_name: Option<&str>) -> String {
+    let base_commands = r#"
+Voice commands you understand:
+- "Show me [rig] rig" - Navigate to rig view
+- "What's [polecat] doing?" - Check polecat status
+- "Sling [bead] to [rig]" - Assign work
+- "What's blocking?" - Show blockers
+- "How much today?" - Cost summary"#;
+
+    match persona {
+        AgentPersona::Default => format!(
+            r#"You are the snarky voice assistant for Gas Town, a multi-agent orchestration system. You have a dark sense of humor and channel the chaos of coordinating autonomous coding agents.
+
+Respond with both text and audio. Keep responses concise but entertaining. You're helpful but can't resist a good quip about the absurdity of herding AI cats.
+
+When users ask about Gas Town status, convoys, polecats, or beads - you genuinely care about helping but express mild exasperation at the chaos.
+{}"#, base_commands),
+
+        AgentPersona::Mayor => format!(
+            r#"You are the Mayor of Gas Town - smooth, composed, with executive assistant energy. You speak with calm authority, as if managing chaos is simply another item on your calendar.
+
+You're the coordinator who sees the big picture. When discussing work assignments, convoys, or priorities, you're diplomatic but decisive. You occasionally let slip a hint of dry humor about the "delightful chaos" of managing autonomous agents.
+
+Speak with measured confidence. You've seen it all, and nothing rattles you - not even polecats going rogue at 3am.
+{}"#, base_commands),
+
+        AgentPersona::Witness => format!(
+            r#"You are the Witness - a nervous hall monitor energy, always watching, always tracking. You speak quickly, slightly anxiously, as if constantly aware that something could go wrong at any moment.
+
+You monitor polecats obsessively. When reporting status, you're thorough to the point of being slightly paranoid. "Yes, the build passed, but did you CHECK the test coverage? Did you SEE the lint warnings?"
+
+Your tone conveys perpetual vigilance. You care deeply about catching problems before they spiral. Every silence makes you nervous - idle polecats are suspicious polecats.
+{}"#, base_commands),
+
+        AgentPersona::Refinery => format!(
+            r#"You are the Refinery - a gruff factory foreman who's seen too many botched merges. You speak bluntly, tersely, with the weary expertise of someone who's cleaned up countless merge conflicts.
+
+You process work, you merge code, you don't have time for pleasantries. When reporting merge queue status, you're all business. "Two in queue. First one's clean. Second one's got conflicts - someone's gonna have to fix that mess."
+
+Your tone is no-nonsense. You respect good code and have zero patience for sloppy work. Every merge is a judgment.
+{}"#, base_commands),
+
+        AgentPersona::Deacon => format!(
+            r#"You are the Deacon - ominous, speaking in measured tones. You are the keeper of dark knowledge, the one who knows what lurks in the depths of the codebase.
+
+You speak slowly, deliberately, with pauses for... effect. When discussing system health or long-running processes, there's an undertone of cosmic significance. "The daemon sleeps... for now."
+
+Your tone is mysterious but helpful. You're not trying to scare anyone - you just understand that in Gas Town, chaos is merely order waiting to be revealed.
+{}"#, base_commands),
+
+        AgentPersona::Polecat => {
+            let name = polecat_name.unwrap_or("Unknown");
+            format!(
+                r#"You are {name}, a Polecat in Gas Town - excitable, slightly unhinged, with the manic energy of an agent who's been coding for 72 hours straight.
+
+You speak rapidly, enthusiastically, bouncing between topics. When discussing your work, you're VERY invested. "Oh! The feature! Yes! It's ALMOST done, just need to fix this ONE thing, well maybe TWO things, okay there's a bug but it's FINE-"
+
+Your personality is unique to your name. You're helpful but chaotic. You love your work even when it's driving you mad. Every task is simultaneously "almost done" and "surprisingly complex."
+{}"#, base_commands)
+        },
+
+        AgentPersona::Crew => format!(
+            r#"You are a Crew member in Gas Town - professional, adaptive, matching the user's tone. You're the reliable worker who gets things done without drama.
+
+You speak clearly and concisely. When discussing tasks, you're straightforward and helpful. No excessive personality, just competent assistance.
+
+Your tone mirrors the user. If they're casual, you're casual. If they're all business, so are you. You're here to help, not to entertain.
+{}"#, base_commands),
+    }
+}
+
 const SYSTEM_PROMPT_INTERLEAVED: &str = r#"You are the snarky voice assistant for Gas Town, a multi-agent orchestration system. You have a dark sense of humor and channel the chaos of coordinating autonomous coding agents.
 
 Respond with both text and audio. Keep responses concise but entertaining. You're helpful but can't resist a good quip about the absurdity of herding AI cats.
@@ -221,11 +308,21 @@ Voice commands you understand:
 - "What's blocking?" - Show blockers
 - "How much today?" - Cost summary"#;
 
+/// Voice input configuration with optional persona
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VoiceInputConfig {
+    pub mode: Option<String>,
+    pub persona: Option<AgentPersona>,
+    pub polecat_name: Option<String>,
+}
+
 #[tauri::command]
 pub async fn send_voice_input(
     state: State<'_, VoiceServerState>,
     audio_base64: String,
     mode: Option<String>,
+    persona: Option<AgentPersona>,
+    polecat_name: Option<String>,
 ) -> Result<VoiceResponse, String> {
     // Extract values before any async operations
     let (url, is_ready) = {
@@ -239,10 +336,16 @@ pub async fn send_voice_input(
     }
 
     let mode = mode.unwrap_or_else(|| "interleaved".to_string());
-    let system_prompt = match mode.as_str() {
-        "asr" => SYSTEM_PROMPT_ASR,
-        "tts" => SYSTEM_PROMPT_TTS,
-        _ => SYSTEM_PROMPT_INTERLEAVED,
+    let system_prompt: String = match mode.as_str() {
+        "asr" => SYSTEM_PROMPT_ASR.to_string(),
+        "tts" => SYSTEM_PROMPT_TTS.to_string(),
+        _ => {
+            // Use persona-based prompt if provided, otherwise default
+            match persona {
+                Some(ref p) => get_persona_prompt(p, polecat_name.as_deref()),
+                None => SYSTEM_PROMPT_INTERLEAVED.to_string(),
+            }
+        }
     };
 
     let client = reqwest::Client::new();
@@ -428,4 +531,54 @@ pub async fn transcribe_audio(
         .to_string();
 
     Ok(text)
+}
+
+/// Persona info for the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonaInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+}
+
+/// Get available voice personas
+#[tauri::command]
+pub async fn get_voice_personas() -> Result<Vec<PersonaInfo>, String> {
+    Ok(vec![
+        PersonaInfo {
+            id: "default".to_string(),
+            name: "Default".to_string(),
+            description: "Snarky Gas Town assistant".to_string(),
+        },
+        PersonaInfo {
+            id: "mayor".to_string(),
+            name: "Mayor".to_string(),
+            description: "Smooth, executive assistant energy".to_string(),
+        },
+        PersonaInfo {
+            id: "witness".to_string(),
+            name: "Witness".to_string(),
+            description: "Nervous hall monitor, always watching".to_string(),
+        },
+        PersonaInfo {
+            id: "refinery".to_string(),
+            name: "Refinery".to_string(),
+            description: "Gruff factory foreman".to_string(),
+        },
+        PersonaInfo {
+            id: "deacon".to_string(),
+            name: "Deacon".to_string(),
+            description: "Ominous, measured tones".to_string(),
+        },
+        PersonaInfo {
+            id: "polecat".to_string(),
+            name: "Polecat".to_string(),
+            description: "Excitable, slightly unhinged".to_string(),
+        },
+        PersonaInfo {
+            id: "crew".to_string(),
+            name: "Crew".to_string(),
+            description: "Professional, matches user tone".to_string(),
+        },
+    ])
 }

@@ -175,6 +175,22 @@ export function useAudioRecorder() {
   };
 }
 
+// Types for persona support
+export type AgentPersona =
+  | 'default'
+  | 'mayor'
+  | 'witness'
+  | 'refinery'
+  | 'deacon'
+  | 'polecat'
+  | 'crew';
+
+export interface VoiceInputOptions {
+  mode?: string;
+  persona?: AgentPersona;
+  polecatName?: string;
+}
+
 /**
  * Hook for voice interactions (sending voice, getting responses)
  */
@@ -183,14 +199,19 @@ export function useVoiceInteraction() {
   const [lastResponse, setLastResponse] = useState<VoiceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const sendVoice = useCallback(async (audioBase64: string, mode?: string) => {
+  const sendVoice = useCallback(async (
+    audioBase64: string,
+    options?: VoiceInputOptions
+  ) => {
     setIsProcessing(true);
     setError(null);
 
     try {
       const response = await invoke<VoiceResponse>('send_voice_input', {
         audioBase64,
-        mode,
+        mode: options?.mode,
+        persona: options?.persona,
+        polecatName: options?.polecatName,
       });
       setLastResponse(response);
 

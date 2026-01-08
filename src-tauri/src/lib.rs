@@ -33,6 +33,7 @@ pub fn run() {
             voice::send_voice_input,
             voice::send_text_to_speech,
             voice::transcribe_audio,
+            voice::get_voice_personas,
             self_test::get_self_test_status,
             self_test::get_test_cases,
             self_test::start_self_test,
