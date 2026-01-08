@@ -16,6 +16,7 @@ import {
   Workflow,
   X,
 } from 'lucide-react'
+import CalmModeToggle from './a11y/CalmModeToggle'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -241,6 +242,11 @@ export default function Header() {
 
           {/* Demo Links End */}
         </nav>
+
+        {/* Accessibility Settings */}
+        <div className="p-4 border-t border-gray-700">
+          <CalmModeToggle showLabel={true} />
+        </div>
       </aside>
     </>
   )
