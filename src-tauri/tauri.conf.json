@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "gastownui",
+  "productName": "GastownUI",
   "version": "0.1.0",
   "identifier": "com.gastownui.app",
   "build": {
@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "GastownUI",
-        "width": 800,
-        "height": 600,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "resizable": true,
         "fullscreen": false
       }
@@ -33,22 +35,50 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "linux": {
-      "deb": {
-        "depends": ["libwebkit2gtk-4.1-0", "libappindicator3-1"],
-        "section": "utils",
-        "priority": "optional"
+    "resources": [],
+    "copyright": "Copyright 2026 Gas Town",
+    "category": "DeveloperTool",
+    "shortDescription": "Voice-first GUI for Gas Town agent orchestration",
+    "longDescription": "GastownUI is a cross-platform, voice-first graphical interface for Gas Town agent orchestration. Monitor rigs, manage merge queues, and command your polecats with style.",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
       },
-      "rpm": {
-        "release": "1",
-        "epoch": "0"
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": null,
+        "sidebarImage": null,
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "displayLanguageSelector": false
       },
-      "appimage": {
-        "bundleMediaFramework": true
+      "wix": {
+        "language": "en-US",
+        "template": null,
+        "upgradeCode": null
       }
     },
-    "category": "Development",
-    "shortDescription": "Cross-platform GUI for Gas Town agent orchestration",
-    "longDescription": "GastownUI provides a visual interface for managing Gas Town multi-agent orchestration system. Features voice control, real-time monitoring, and tmux session management."
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": null,
+      "frameworks": [],
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": null,
+      "providerShortName": null
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      },
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
+      },
+      "rpm": {
+        "release": "1"
+      }
+    }
   }
 }
