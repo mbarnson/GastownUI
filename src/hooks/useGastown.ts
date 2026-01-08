@@ -40,114 +40,10 @@ export async function runCommand(cmd: string, args: string[]): Promise<CommandRe
   return invoke<CommandResult>('run_gt_command', { cmd, args })
 }
 
-// Check if running in Tauri context
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window
-}
-
 // Check if in browser (for SSR safety)
 const isBrowser = typeof window !== 'undefined'
 
-// Mock data for development without Tauri
-const mockBeads: Bead[] = [
-  {
-    id: 'ga-9mv',
-    title: 'Dashboard View - The Refinery Floor',
-    status: 'in_progress',
-    type: 'feature',
-    priority: 2,
-    assignee: 'GastownUI/slit',
-    created: '2026-01-07',
-    updated: '2026-01-07',
-  },
-  {
-    id: 'ga-mmy',
-    title: 'Voice Command Interface - Snarky LFM2.5',
-    status: 'open',
-    type: 'feature',
-    priority: 1,
-    created: '2026-01-07',
-    updated: '2026-01-07',
-  },
-  {
-    id: 'ga-egk',
-    title: 'Tmux Integration Panel - Window into chaos',
-    status: 'open',
-    type: 'feature',
-    priority: 2,
-    created: '2026-01-07',
-    updated: '2026-01-07',
-  },
-]
-
-const mockConvoys: Convoy[] = [
-  {
-    id: 'convoy-001',
-    name: 'Phase 1: Core UI MVP',
-    beads: ['ga-9mv', 'ga-mmy', 'ga-egk', 'ga-jj2'],
-    progress: 25,
-    active_polecats: 2,
-    status: 'running',
-    created: '2026-01-07',
-    eta: '~2 hours',
-  },
-]
-
-const mockTownStatus: TownStatus = {
-  healthy: true,
-  rigs: [
-    {
-      name: 'GastownUI',
-      path: '/Users/patbarnson/gt/GastownUI',
-      polecats: [
-        {
-          name: 'slit',
-          rig: 'GastownUI',
-          status: 'active',
-          current_work: 'ga-9mv',
-          last_activity: new Date().toISOString(),
-        },
-        {
-          name: 'furiosa',
-          rig: 'GastownUI',
-          status: 'idle',
-          last_activity: new Date().toISOString(),
-        },
-      ],
-      beads_count: { open: 3, in_progress: 1, closed: 1, blocked: 0 },
-    },
-  ],
-  active_agents: 2,
-  running_convoys: 1,
-  cost_today: 47.23,
-  cost_rate: 12.5,
-}
-
-const mockActivity: ActivityItem[] = [
-  {
-    id: 'act-1',
-    timestamp: new Date().toISOString(),
-    type: 'bead_update',
-    message: 'Polecat slit claimed ga-9mv',
-    actor: 'slit',
-    bead_id: 'ga-9mv',
-  },
-  {
-    id: 'act-2',
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-    type: 'merge',
-    message: 'Refinery merged ga-6tk (scaffold) to main',
-    actor: 'refinery',
-    bead_id: 'ga-6tk',
-  },
-  {
-    id: 'act-3',
-    timestamp: new Date(Date.now() - 120000).toISOString(),
-    type: 'convoy',
-    message: 'Convoy "Phase 1: Core UI MVP" started',
-    actor: 'mayor',
-  },
-]
+// All hooks use real Tauri invocations - no mock data fallbacks
 
 // Parse bd list output
 function parseBeadsOutput(output: string): Bead[] {
@@ -191,26 +87,45 @@ function parsePolecatsOutput(output: string, rigName: string): Polecat[] {
   return polecats
 }
 
+// Parse gt convoy list output
+function parseConvoyOutput(output: string): Convoy[] {
+  const lines = output.trim().split('\n').filter(Boolean)
+  const convoys: Convoy[] = []
+
+  for (const line of lines) {
+    // Parse format: "convoy-id name [status] progress% (N polecats)"
+    const match = line.match(/^(\S+)\s+(.+?)\s+\[(\w+)\]\s+(\d+)%\s+\((\d+)\s+polecats?\)/)
+    if (match) {
+      convoys.push({
+        id: match[1],
+        name: match[2].trim(),
+        beads: [],
+        progress: parseInt(match[4]),
+        active_polecats: parseInt(match[5]),
+        status: match[3] as Convoy['status'],
+        created: '',
+      })
+    }
+  }
+  return convoys
+}
+
 // Real-time convoy status (2s polling)
 export function useConvoys() {
   return useQuery({
     queryKey: ['convoys'],
     queryFn: async (): Promise<Convoy[]> => {
-      if (!isTauri()) {
-        return mockConvoys
-      }
-
       const result = await runCommand('gt', ['convoy', 'list'])
       if (result.exit_code !== 0) {
         console.warn('gt convoy list failed:', result.stderr)
         return []
       }
 
-      // TODO: Implement actual parsing when we know the format
-      return []
+      return parseConvoyOutput(result.stdout)
     },
     refetchInterval: 2000,
     staleTime: 1000,
+    enabled: isBrowser,
   })
 }
 
@@ -235,13 +150,6 @@ export function useBeads(rigOrStatus?: string, status?: BeadStatus) {
   return useQuery({
     queryKey: ['beads', rigOrStatus, status],
     queryFn: async (): Promise<Bead[]> => {
-      if (!isTauri()) {
-        const filterStatus = status || (rigOrStatus as BeadStatus)
-        return filterStatus
-          ? mockBeads.filter((b) => b.status === filterStatus)
-          : mockBeads
-      }
-
       const args = ['list']
       const filterStatus = status || rigOrStatus
       if (filterStatus && ['open', 'in_progress', 'closed'].includes(filterStatus)) {
@@ -324,46 +232,85 @@ export function useReorderMergeQueue(_rig: string) {
   })
 }
 
+// Parse gt status --json output for town status
+function parseTownStatusOutput(statusOutput: string, rigsOutput: string): TownStatus {
+  let healthy = true
+  let active_agents = 0
+  let running_convoys = 0
+  const rigs: Rig[] = []
+
+  // Parse rigs list
+  const rigNames = rigsOutput.trim().split('\n').filter(Boolean)
+  for (const name of rigNames) {
+    rigs.push({
+      name: name.trim(),
+      path: '',
+      polecats: [],
+      beads_count: { open: 0, in_progress: 0, closed: 0, blocked: 0 },
+    })
+  }
+
+  // Try to parse status output for agent/convoy counts
+  const lines = statusOutput.split('\n')
+  for (const line of lines) {
+    const agentMatch = line.match(/(\d+)\s+active\s+agents?/i)
+    if (agentMatch) active_agents = parseInt(agentMatch[1])
+    const convoyMatch = line.match(/(\d+)\s+running\s+convoys?/i)
+    if (convoyMatch) running_convoys = parseInt(convoyMatch[1])
+    if (line.toLowerCase().includes('unhealthy') || line.toLowerCase().includes('error')) {
+      healthy = false
+    }
+  }
+
+  return { healthy, rigs, active_agents, running_convoys }
+}
+
 // Town status (health, rigs, agents)
 export function useTownStatus() {
   return useQuery({
     queryKey: ['townStatus'],
     queryFn: async (): Promise<TownStatus> => {
-      if (!isTauri()) {
-        return mockTownStatus
-      }
-
       const [statusResult, rigsResult] = await Promise.all([
         runCommand('gt', ['status']),
         runCommand('gt', ['rigs']),
       ])
 
-      return {
-        healthy: statusResult.exit_code === 0,
-        rigs: [],
-        active_agents: 0,
-        running_convoys: 0,
-      }
+      return parseTownStatusOutput(
+        statusResult.stdout || '',
+        rigsResult.stdout || ''
+      )
     },
     refetchInterval: 5000,
     staleTime: 2000,
+    enabled: isBrowser,
   })
 }
 
-// Activity feed
+// Activity feed - reads recent bead updates
 export function useActivityFeed() {
   return useQuery({
     queryKey: ['activity'],
     queryFn: async (): Promise<ActivityItem[]> => {
-      if (!isTauri()) {
-        return mockActivity
+      // Get recent bead activity from bd list with timestamps
+      const result = await runCommand('bd', ['list', '--limit', '20'])
+      if (result.exit_code !== 0) {
+        return []
       }
 
-      // TODO: Read from beads interactions.jsonl
-      return []
+      // Parse into activity items (each bead update is an activity)
+      const beads = parseBeadsOutput(result.stdout)
+      return beads.map((bead, idx) => ({
+        id: `act-${bead.id}`,
+        timestamp: bead.updated || new Date().toISOString(),
+        type: 'bead_update' as const,
+        message: `${bead.status}: ${bead.title}`,
+        actor: bead.assignee || 'system',
+        bead_id: bead.id,
+      }))
     },
     refetchInterval: 3000,
     staleTime: 1000,
+    enabled: isBrowser,
   })
 }
 
@@ -372,17 +319,11 @@ export function useTmuxSessions() {
   return useQuery({
     queryKey: ['tmuxSessions'],
     queryFn: async (): Promise<TmuxSession[]> => {
-      if (!isTauri()) {
-        return [
-          { name: 'gastown-slit', windows: 1, attached: true },
-          { name: 'gastown-refinery', windows: 1, attached: false },
-        ]
-      }
-
       return invoke<TmuxSession[]>('list_tmux_sessions')
     },
     refetchInterval: 5000,
     staleTime: 2000,
+    enabled: isBrowser,
   })
 }
 
@@ -398,10 +339,6 @@ export function useSling() {
       bead: string
       rig: string
     }): Promise<CommandResult> => {
-      if (!isTauri()) {
-        return { stdout: 'Mock sling successful', stderr: '', exit_code: 0 }
-      }
-
       return runCommand('gt', ['sling', bead, rig])
     },
     onSuccess: () => {
@@ -419,10 +356,6 @@ export function useCloseBead() {
 
   return useMutation({
     mutationFn: async ({ beadId, reason }: { beadId: string; reason?: string }): Promise<CommandResult> => {
-      if (!isTauri()) {
-        return { stdout: 'Mock close successful', stderr: '', exit_code: 0 }
-      }
-
       const args = ['close', beadId]
       if (reason) {
         args.push('--reason', reason)
@@ -546,22 +479,6 @@ export function useSetupStatus() {
   return useQuery({
     queryKey: ['setupStatus'],
     queryFn: async (): Promise<SetupStatus> => {
-      if (!isTauri()) {
-        const dependencies = setupDependencies.map((dep) => ({
-          name: dep.name,
-          installed: true,
-          version: 'dev',
-        }))
-        return {
-          ready: true,
-          missing_count: 0,
-          workspace_exists: true,
-          workspace_path: '~/gt',
-          voice_guidance: 'All set. Welcome to Gas Town.',
-          dependencies,
-        }
-      }
-
       const dependencies: DependencyInfo[] = []
       for (const dep of setupDependencies) {
         const { installed, version } = await checkDependency(
@@ -669,19 +586,6 @@ export function useSetupState() {
   return useQuery({
     queryKey: ['setupState'],
     queryFn: async (): Promise<SetupState> => {
-      if (!isTauri()) {
-        // Return mock complete state in development
-        return {
-          hasGo: true,
-          hasBd: true,
-          hasBdMinVersion: true,
-          hasGt: true,
-          hasGtMinVersion: true,
-          hasWorkspace: true,
-          workspacePath: '~/gt',
-        }
-      }
-
       // Check for bd and gt
       const [bdResult, gtResult] = await Promise.all([
         runCommand('bd', ['version']).catch(() => null),
