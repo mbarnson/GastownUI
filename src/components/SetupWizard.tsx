@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Edit3,
   FolderOpen,
+  Zap,
+  ChevronDown,
 } from 'lucide-react'
 import {
   useSetupStatus,
@@ -32,6 +34,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [activeInstall, setActiveInstall] = useState<string | null>(null)
   const [workspacePath, setWorkspacePath] = useState<string>('~/gt')
   const [showPathInput, setShowPathInput] = useState(false)
+  const [showDepsInQuickSetup, setShowDepsInQuickSetup] = useState(false)
+
+  // Detect Quick Setup eligibility: all deps installed but no workspace
+  const isQuickSetupEligible = status && status.missing_count === 0 && !status.workspace_exists
 
   if (isLoading) {
     return (
@@ -70,6 +76,132 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         >
           Enter Gas Town
         </button>
+      </div>
+    )
+  }
+
+  // Quick Setup: All tools installed, just need workspace
+  if (isQuickSetupEligible) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        {/* Quick Setup Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/20 mb-4">
+            <Zap className="w-8 h-8 text-green-400" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Quick Setup
+          </h1>
+          <p className="text-gray-400">
+            All tools installed! Just create a workspace to get started.
+          </p>
+        </div>
+
+        {/* Voice Guidance */}
+        {(voiceResponse || status.voice_guidance) && (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-orange-500/20 rounded-lg">
+                <Mic className="w-5 h-5 text-orange-400" />
+              </div>
+              <div>
+                <div className="text-sm text-gray-500 mb-1">Voice Assistant</div>
+                <p className="text-gray-300">
+                  {voiceResponse || status.voice_guidance}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Workspace Creation - Prominent */}
+        <div className="bg-slate-800/50 border-2 border-orange-500/50 rounded-xl overflow-hidden mb-6">
+          <div className="px-4 py-3 border-b border-slate-700 bg-orange-500/10">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-orange-400" />
+              Create Workspace
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {/* Path Input */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Workspace Location
+                </label>
+                <div className="relative">
+                  <Folder className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input
+                    type="text"
+                    value={workspacePath}
+                    onChange={handlePathChange}
+                    placeholder="~/gt"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 text-lg"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  This directory will be created if it doesn't exist. Use ~ for home directory.
+                </p>
+              </div>
+
+              {/* Create Button */}
+              <button
+                onClick={handleCreateWorkspace}
+                disabled={activeInstall !== null}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold text-lg rounded-lg transition-colors"
+              >
+                {activeInstall === 'workspace' ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Flame className="w-5 h-5" />
+                )}
+                Create Workspace at {workspacePath}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Collapsible Dependencies Status */}
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowDepsInQuickSetup(!showDepsInQuickSetup)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-700/30 transition-colors"
+          >
+            <span className="text-sm text-gray-400 flex items-center gap-2">
+              <Check className="w-4 h-4 text-green-400" />
+              All {status.dependencies.length} dependencies installed
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-gray-500 transition-transform ${
+                showDepsInQuickSetup ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          {showDepsInQuickSetup && (
+            <div className="border-t border-slate-700 divide-y divide-slate-700">
+              {status.dependencies.map((dep) => (
+                <div key={dep.name} className="px-4 py-2 flex items-center gap-3 text-sm">
+                  <Check className="w-4 h-4 text-green-400" />
+                  <span className="text-white">{dep.name}</span>
+                  <span className="text-gray-500">{dep.version}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Refresh Button */}
+        <div className="text-center mt-6">
+          <button
+            onClick={() => {
+              setVoiceResponse(null)
+              refetch()
+            }}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
+            Refresh Status
+          </button>
+        </div>
       </div>
     )
   }
