@@ -76,18 +76,60 @@ fn check_go() -> DependencyInfo {
     }
 }
 
-/// Check gt CLI installation
+/// Minimum required gt version
+const MIN_GT_VERSION: &str = "0.1.0";
+
+/// Check gt CLI installation with version comparison
 fn check_gt() -> DependencyInfo {
     let (installed, version, path) = check_command("gt", &["--version"]);
 
+    // Check if version meets minimum requirement
+    let version_ok = version.as_ref().map(|v| {
+        // Parse version string (e.g., "gt version 0.1.0" or "0.1.0")
+        let ver_str = v.split_whitespace()
+            .find(|s| s.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+            .unwrap_or("0.0.0");
+        compare_versions(ver_str, MIN_GT_VERSION) >= 0
+    }).unwrap_or(false);
+
+    let install_instructions = if installed && !version_ok {
+        format!("Update gt: `go install github.com/txgsync/gastown/cmd/gt@latest` (current version outdated, need >= {})", MIN_GT_VERSION)
+    } else {
+        "Install gt: `go install github.com/txgsync/gastown/cmd/gt@latest`".to_string()
+    };
+
     DependencyInfo {
         name: "gt (Gas Town CLI)".to_string(),
-        installed,
+        installed: installed && version_ok,
         version,
         path,
         install_url: "https://github.com/txgsync/gastown".to_string(),
-        install_instructions: "Install gt: `go install github.com/txgsync/gastown/cmd/gt@latest`".to_string(),
+        install_instructions,
     }
+}
+
+/// Simple version comparison (returns -1, 0, or 1)
+fn compare_versions(v1: &str, v2: &str) -> i32 {
+    let parse_version = |v: &str| -> Vec<u32> {
+        v.split('.')
+            .filter_map(|s| s.parse::<u32>().ok())
+            .collect()
+    };
+
+    let parts1 = parse_version(v1);
+    let parts2 = parse_version(v2);
+
+    for i in 0..std::cmp::max(parts1.len(), parts2.len()) {
+        let p1 = parts1.get(i).unwrap_or(&0);
+        let p2 = parts2.get(i).unwrap_or(&0);
+        if p1 < p2 {
+            return -1;
+        }
+        if p1 > p2 {
+            return 1;
+        }
+    }
+    0
 }
 
 /// Check bd CLI installation
@@ -336,16 +378,33 @@ pub async fn install_dependency(name: String) -> Result<InstallResult, String> {
     }
 }
 
+/// Expand ~ to home directory
+fn expand_tilde(path: &str) -> PathBuf {
+    if path.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(&path[2..]);
+        }
+    } else if path == "~" {
+        if let Some(home) = dirs::home_dir() {
+            return home;
+        }
+    }
+    PathBuf::from(path)
+}
+
 /// Create a new Gas Town workspace
 #[tauri::command]
 pub async fn create_workspace(path: Option<String>) -> Result<InstallResult, String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
+
+    // Expand ~ in path and use default if not provided
     let workspace_path = path
-        .map(PathBuf::from)
+        .map(|p| expand_tilde(&p))
         .unwrap_or_else(|| home.join("gt"));
 
     // Check if path already exists
     if workspace_path.exists() {
+        // Check if it's already a Gas Town workspace
         if workspace_path.join(".gt").exists() {
             return Ok(InstallResult {
                 success: true,
@@ -354,18 +413,35 @@ pub async fn create_workspace(path: Option<String>) -> Result<InstallResult, Str
                 voice_response: format!("You already have a Gas Town workspace at {}. You're all set!", workspace_path.display()),
             });
         }
+
+        // Directory exists but isn't a Gas Town workspace
+        // Check if it's empty
+        let is_empty = std::fs::read_dir(&workspace_path)
+            .map(|mut entries| entries.next().is_none())
+            .unwrap_or(false);
+
+        if !is_empty {
+            return Ok(InstallResult {
+                success: false,
+                message: format!("Directory {} exists and is not empty", workspace_path.display()),
+                next_step: None,
+                voice_response: format!(
+                    "The directory {} already exists and isn't empty. Choose a different path, or empty that directory first if you want to use it.",
+                    workspace_path.display()
+                ),
+            });
+        }
     }
 
-    // Create directory
+    // Create directory if it doesn't exist
     std::fs::create_dir_all(&workspace_path)
         .map_err(|e| format!("Failed to create workspace directory: {}", e))?;
 
-    // Initialize with gt init
+    // Initialize with gt install (creates HQ structure)
     let output = Command::new("gt")
-        .args(["init"])
-        .current_dir(&workspace_path)
+        .args(["install", workspace_path.to_string_lossy().as_ref()])
         .output()
-        .map_err(|e| format!("Failed to run gt init: {}", e))?;
+        .map_err(|e| format!("Failed to run gt install: {}", e))?;
 
     if output.status.success() {
         Ok(InstallResult {
@@ -379,11 +455,36 @@ pub async fn create_workspace(path: Option<String>) -> Result<InstallResult, Str
         })
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        // Try gt init as fallback (older version)
+        let init_output = Command::new("gt")
+            .args(["init"])
+            .current_dir(&workspace_path)
+            .output();
+
+        if let Ok(out) = init_output {
+            if out.status.success() {
+                return Ok(InstallResult {
+                    success: true,
+                    message: format!("Workspace created at {} (using gt init)", workspace_path.display()),
+                    next_step: None,
+                    voice_response: format!(
+                        "Welcome to Gas Town! Your workspace is ready at {}. You can now add rigs with 'gt rig add' or just start slinging work.",
+                        workspace_path.display()
+                    ),
+                });
+            }
+        }
+
         Ok(InstallResult {
             success: false,
-            message: format!("Failed to initialize workspace: {}", stderr),
+            message: format!("Failed to initialize workspace: {}", if stderr.is_empty() { &stdout } else { &stderr }),
             next_step: None,
-            voice_response: format!("Workspace creation failed: {}. Make sure gt is installed and working.", stderr.lines().next().unwrap_or("unknown error")),
+            voice_response: format!(
+                "Workspace creation failed: {}. Make sure gt is installed and working.",
+                stderr.lines().next().unwrap_or(stdout.lines().next().unwrap_or("unknown error"))
+            ),
         })
     }
 }
