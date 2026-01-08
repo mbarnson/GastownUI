@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["dmg", "app"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,49 +35,20 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [],
-    "copyright": "Copyright 2026 Gas Town",
     "category": "DeveloperTool",
-    "shortDescription": "Voice-first GUI for Gas Town agent orchestration",
-    "longDescription": "GastownUI is a cross-platform, voice-first graphical interface for Gas Town agent orchestration. Monitor rigs, manage merge queues, and command your polecats with style.",
-    "windows": {
-      "certificateThumbprint": null,
-      "digestAlgorithm": "sha256",
-      "timestampUrl": "http://timestamp.digicert.com",
-      "webviewInstallMode": {
-        "type": "downloadBootstrapper"
-      },
-      "nsis": {
-        "installerIcon": "icons/icon.ico",
-        "headerImage": null,
-        "sidebarImage": null,
-        "installMode": "currentUser",
-        "languages": ["English"],
-        "displayLanguageSelector": false
-      },
-      "wix": {
-        "language": "en-US",
-        "template": null,
-        "upgradeCode": null
-      }
-    },
+    "shortDescription": "Multi-agent orchestration for Gas Town",
+    "longDescription": "GastownUI provides a visual interface for managing Gas Town's multi-agent workspace, including polecats, rigs, molecules, and mail.",
     "macOS": {
-      "entitlements": null,
+      "entitlements": "entitlements.plist",
       "exceptionDomain": null,
       "frameworks": [],
       "minimumSystemVersion": "10.15",
       "signingIdentity": null,
-      "providerShortName": null
-    },
-    "linux": {
-      "appimage": {
-        "bundleMediaFramework": false
-      },
-      "deb": {
-        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
-      },
-      "rpm": {
-        "release": "1"
+      "providerShortName": null,
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 },
+        "windowSize": { "width": 660, "height": 400 }
       }
     }
   }
