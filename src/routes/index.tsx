@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
-import { useConvoys, useTmuxSessions, useBeads } from '../hooks/useGastown'
+import { SetupBanner } from '../components/SetupBanner'
+import { useConvoys, useTmuxSessions, useBeads, useSetupState } from '../hooks/useGastown'
 import {
   Truck,
   Terminal,
@@ -15,9 +16,18 @@ function Dashboard() {
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: sessions } = useTmuxSessions()
   const { data: readyBeads } = useBeads(undefined, 'open')
+  const { data: setupState } = useSetupState()
+
+  // Check if setup is complete
+  const isSetupComplete = setupState?.hasWorkspace &&
+    setupState?.hasGtMinVersion &&
+    setupState?.hasBdMinVersion
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
+      {/* Setup Warning Banner */}
+      <SetupBanner isSetupComplete={isSetupComplete ?? true} />
+
       {/* Header */}
       <header className="border-b border-slate-700 bg-slate-900/50 backdrop-blur">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">

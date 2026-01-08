@@ -436,3 +436,86 @@ export function useUpdateBead() {
     },
   })
 }
+
+// Setup state for FTUE banner
+export interface SetupState {
+  hasGo: boolean
+  hasBd: boolean
+  hasBdMinVersion: boolean
+  hasGt: boolean
+  hasGtMinVersion: boolean
+  hasWorkspace: boolean
+  workspacePath?: string
+}
+
+// Check Gas Town setup state (for FTUE banner)
+export function useSetupState() {
+  return useQuery({
+    queryKey: ['setupState'],
+    queryFn: async (): Promise<SetupState> => {
+      if (!isTauri()) {
+        // Return mock complete state in development
+        return {
+          hasGo: true,
+          hasBd: true,
+          hasBdMinVersion: true,
+          hasGt: true,
+          hasGtMinVersion: true,
+          hasWorkspace: true,
+          workspacePath: '~/gt',
+        }
+      }
+
+      // Check for bd and gt
+      const [bdResult, gtResult] = await Promise.all([
+        runCommand('bd', ['version']).catch(() => null),
+        runCommand('gt', ['version']).catch(() => null),
+      ])
+
+      const hasBd = bdResult?.exit_code === 0
+      const hasGt = gtResult?.exit_code === 0
+
+      // Parse versions
+      const bdVersion = bdResult?.stdout?.match(/bd version (\d+\.\d+\.\d+)/)?.[1]
+      const gtVersion = gtResult?.stdout?.match(/gt version (\d+\.\d+\.\d+)/)?.[1]
+
+      const hasBdMinVersion = bdVersion ? compareVersions(bdVersion, '0.43.0') >= 0 : false
+      const hasGtMinVersion = gtVersion ? compareVersions(gtVersion, '0.2.0') >= 0 : false
+
+      // Check workspace
+      let hasWorkspace = false
+      let workspacePath: string | undefined
+      if (hasGt) {
+        const statusResult = await runCommand('gt', ['status']).catch(() => null)
+        hasWorkspace = statusResult?.exit_code === 0
+        // Could parse workspace path from output if needed
+      }
+
+      return {
+        hasGo: true, // If bd/gt work, Go is installed
+        hasBd,
+        hasBdMinVersion,
+        hasGt,
+        hasGtMinVersion,
+        hasWorkspace,
+        workspacePath,
+      }
+    },
+    staleTime: 60000, // Cache for 1 minute
+    enabled: isBrowser,
+  })
+}
+
+// Simple version comparison
+function compareVersions(a: string, b: string): number {
+  const partsA = a.split('.').map(Number)
+  const partsB = b.split('.').map(Number)
+
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+    const numA = partsA[i] || 0
+    const numB = partsB[i] || 0
+    if (numA > numB) return 1
+    if (numA < numB) return -1
+  }
+  return 0
+}
