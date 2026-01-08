@@ -23,6 +23,67 @@ interface VoiceInterfaceProps {
   defaultMode?: VoiceMode;
 }
 
+class AudioStreamPlayer {
+  private context: AudioContext | null = null;
+  private nextStartTime = 0;
+  private closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  enqueue(base64Chunk: string, sampleRate: number) {
+    if (!base64Chunk) {
+      return;
+    }
+    if (!this.context || this.context.sampleRate !== sampleRate) {
+      this.reset(sampleRate);
+    }
+    if (!this.context) {
+      return;
+    }
+    const samples = decodeAudioChunk(base64Chunk);
+    if (samples.length === 0) {
+      return;
+    }
+    const buffer = this.context.createBuffer(1, samples.length, sampleRate);
+    buffer.copyToChannel(samples, 0);
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.context.destination);
+    const startAt = Math.max(this.context.currentTime, this.nextStartTime);
+    source.start(startAt);
+    this.nextStartTime = startAt + buffer.duration;
+  }
+
+  reset(sampleRate: number) {
+    this.stop();
+    this.context = new AudioContext({ sampleRate });
+    this.nextStartTime = this.context.currentTime;
+  }
+
+  stop() {
+    if (!this.context) {
+      return;
+    }
+    const context = this.context;
+    const delay = Math.max(0, this.nextStartTime - context.currentTime);
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer);
+    }
+    this.closeTimer = setTimeout(() => {
+      context.close();
+    }, (delay + 0.05) * 1000);
+    this.context = null;
+    this.nextStartTime = 0;
+  }
+}
+
+function decodeAudioChunk(base64Chunk: string): Float32Array {
+  const binaryString = atob(base64Chunk);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Float32Array(bytes.buffer);
+}
+
 export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceInterfaceProps) {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [isHolding, setIsHolding] = useState(false);
@@ -82,6 +143,12 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     }
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      audioStreamRef.current?.stop();
+    };
+  }, []);
 
   // Process recorded audio when recording stops
   useEffect(() => {

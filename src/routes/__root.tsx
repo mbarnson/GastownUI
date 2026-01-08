@@ -2,6 +2,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 import Header from '../components/Header'
 
@@ -76,6 +77,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function RootBody({ children }: { children: React.ReactNode }) {
   const { isCalm } = useCalmMode()
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual'
+    }
+    window.scrollTo(0, 0)
+  }, [])
 
   return (
     <body className={isCalm ? 'calm-mode' : ''}>
