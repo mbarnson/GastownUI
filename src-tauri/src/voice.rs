@@ -22,6 +22,21 @@ impl Default for VoiceServerState {
     }
 }
 
+/// Cleanup voice server process on app exit
+impl Drop for VoiceServerState {
+    fn drop(&mut self) {
+        if let Ok(mut process) = self.server_process.lock() {
+            if let Some(mut child) = process.take() {
+                log::info!("Cleaning up voice server on app exit");
+                if let Err(e) = child.kill() {
+                    log::warn!("Failed to kill voice server: {}", e);
+                }
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VoiceServerConfig {
     pub model_dir: String,
