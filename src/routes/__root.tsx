@@ -1,10 +1,18 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import Header from '../components/Header'
 
 import appCss from '../styles.css?url'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 export const Route = createRootRoute({
   head: () => ({
@@ -17,7 +25,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'GastownUI - Gas Town Control Center',
+        title: 'GastownUI',
       },
     ],
     links: [
@@ -38,19 +46,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <Header />
-        {children}
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        <QueryClientProvider client={queryClient}>
+          <Header />
+          {children}
+        </QueryClientProvider>
         <Scripts />
       </body>
     </html>
