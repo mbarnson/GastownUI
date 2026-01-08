@@ -12,6 +12,7 @@ import {
   Logo,
   MicrophoneIndicator,
   getChecklistFromSetup,
+  useFTUEVoice,
   type FTUEState,
 } from '../ftue'
 
@@ -26,6 +27,17 @@ function FTUEPage() {
   const [state, dispatch] = useReducer(ftueReducer, undefined, createInitialState)
   const detector = useMemo(() => getDetector(), [])
 
+  // Voice integration
+  const {
+    isSpeaking,
+    isReady: voiceReady,
+    speakDetection,
+  } = useFTUEVoice({
+    step: state.step,
+    voiceEnabled: state.voiceEnabled,
+    platform: state.setupState.platform,
+  })
+
   // Initial detection on mount
   useEffect(() => {
     detector.checkAll().then(setupState => {
@@ -38,6 +50,8 @@ function FTUEPage() {
     if (state.step === 'waiting_for_go' || state.step === 'install_go') {
       detector.startPolling('go', (detected, version) => {
         if (detected && version) {
+          // Speak detection success before dispatching
+          speakDetection('go', version)
           dispatch({ type: 'GO_DETECTED', version })
         }
       })
@@ -46,6 +60,7 @@ function FTUEPage() {
     if (state.step === 'waiting_for_beads' || state.step === 'install_beads') {
       detector.startPolling('bd', (detected, version) => {
         if (detected && version) {
+          speakDetection('bd', version)
           dispatch({ type: 'BD_DETECTED', version })
         }
       })
@@ -54,6 +69,7 @@ function FTUEPage() {
     if (state.step === 'waiting_for_gastown' || state.step === 'install_gastown') {
       detector.startPolling('gt', (detected, version) => {
         if (detected && version) {
+          speakDetection('gt', version)
           dispatch({ type: 'GT_DETECTED', version })
         }
       })
@@ -62,7 +78,7 @@ function FTUEPage() {
     return () => {
       detector.stopPolling()
     }
-  }, [state.step, detector])
+  }, [state.step, detector, speakDetection])
 
   // Navigation handlers
   const handleProceed = useCallback(() => {
@@ -105,6 +121,7 @@ function FTUEPage() {
           description="Go is the programming language that Gas Town and Beads are written in."
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
+          isSpeaking={isSpeaking}
         >
           <InstallInstructions
             platform={state.setupState.platform}
@@ -125,6 +142,7 @@ function FTUEPage() {
           description="Beads is a Git-backed issue tracker that your agents will use to coordinate work."
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
+          isSpeaking={isSpeaking}
         >
           <CommandBlock
             command="go install github.com/steveyegge/beads/cmd/bd@latest"
@@ -147,6 +165,7 @@ function FTUEPage() {
           description="Gas Town is the multi-agent orchestration system."
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
+          isSpeaking={isSpeaking}
         >
           <CommandBlock
             command="go install github.com/steveyegge/gastown/cmd/gt@latest"
@@ -167,6 +186,7 @@ function FTUEPage() {
           onConfigure={(path) => dispatch({ type: 'SET_CUSTOM_PATH', path })}
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
+          isSpeaking={isSpeaking}
         />
       )
 
@@ -213,6 +233,7 @@ function InstallStep({
   children,
   onToggleVoice,
   onSkip,
+  isSpeaking = false,
 }: {
   state: FTUEState
   title: string
@@ -220,6 +241,7 @@ function InstallStep({
   children: React.ReactNode
   onToggleVoice: () => void
   onSkip: () => void
+  isSpeaking?: boolean
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
 
@@ -239,7 +261,11 @@ function InstallStep({
 
         <SetupChecklist items={checklist} />
 
-        <MicrophoneIndicator enabled={state.voiceEnabled} onToggle={onToggleVoice} />
+        <MicrophoneIndicator
+          enabled={state.voiceEnabled}
+          isSpeaking={isSpeaking}
+          onToggle={onToggleVoice}
+        />
       </main>
 
       <footer className="px-6 py-4 flex justify-center">
@@ -260,11 +286,13 @@ function WorkspaceConfigStep({
   onConfigure,
   onToggleVoice,
   onSkip,
+  isSpeaking = false,
 }: {
   state: FTUEState
   onConfigure: (path: string) => void
   onToggleVoice: () => void
   onSkip: () => void
+  isSpeaking?: boolean
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
   const defaultPath = '~/gt'
@@ -306,7 +334,11 @@ function WorkspaceConfigStep({
 
         <SetupChecklist items={checklist} currentItemId="workspace" />
 
-        <MicrophoneIndicator enabled={state.voiceEnabled} onToggle={onToggleVoice} />
+        <MicrophoneIndicator
+          enabled={state.voiceEnabled}
+          isSpeaking={isSpeaking}
+          onToggle={onToggleVoice}
+        />
       </main>
 
       <footer className="px-6 py-4 flex justify-center">
