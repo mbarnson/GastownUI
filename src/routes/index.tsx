@@ -6,7 +6,7 @@ import TmuxPanel from '../components/TmuxPanel'
 import { DeepQueryPanel } from '../components/DeepQueryPanel'
 import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
 import { SetupBanner } from '../components/SetupBanner'
-import { useConvoys, useBeads } from '../hooks/useGastown'
+import { useConvoys, useBeads, useStopAll } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
 import { useSetupStatus, isSetupComplete } from '../hooks/useSetup'
 import { useSetupPreferences } from '../hooks/useSetupPreferences'
@@ -28,6 +28,7 @@ function Dashboard() {
   const { data: molecules } = useActiveMolecules()
   const { data: setupStatus, isLoading: setupLoading } = useSetupStatus()
   const { preferences: setupPrefs, isLoaded: prefsLoaded } = useSetupPreferences()
+  const stopAll = useStopAll()
 
   // Redirect to setup if dependencies are missing (unless setup was skipped)
   useEffect(() => {
@@ -178,13 +179,28 @@ function Dashboard() {
       {/* Emergency Stop */}
       <div className="fixed bottom-6 right-6">
         <button
-          className="p-4 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg shadow-red-600/30 transition-all hover:scale-105"
+          className={`p-4 text-white rounded-full shadow-lg transition-all hover:scale-105 ${
+            stopAll.isPending
+              ? 'bg-red-800 cursor-wait shadow-red-800/30'
+              : 'bg-red-600 hover:bg-red-700 shadow-red-600/30'
+          }`}
           title="Emergency Stop All"
           aria-label="Emergency Stop All Gas Town agents"
+          disabled={stopAll.isPending}
           onClick={() => {
-            if (window.confirm('Stop ALL Gas Town agents? This cannot be undone.')) {
-              // TODO: Implement emergency stop
-              alert('Emergency stop not yet implemented')
+            if (window.confirm('This will stop ALL Gas Town agents. Convoys will be interrupted. Continue?')) {
+              stopAll.mutate(undefined, {
+                onSuccess: (result) => {
+                  if (result.exit_code === 0) {
+                    alert('Emergency stop complete. All agents stopped.')
+                  } else {
+                    alert(`Emergency stop failed: ${result.stderr || 'Unknown error'}`)
+                  }
+                },
+                onError: (error) => {
+                  alert(`Emergency stop failed: ${error instanceof Error ? error.message : String(error)}`)
+                },
+              })
             }
           }}
         >

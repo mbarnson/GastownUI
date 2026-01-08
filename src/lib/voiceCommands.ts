@@ -37,6 +37,7 @@ export type CommandIntent =
   | 'send_mail'
   | 'show_cost'
   | 'show_stats'
+  | 'emergency_stop'
   | 'unknown';
 
 export interface CommandResponse {
@@ -151,6 +152,17 @@ const INTENT_PATTERNS: IntentPattern[] = [
       /numbers/i,
     ],
   },
+  {
+    intent: 'emergency_stop',
+    patterns: [
+      /emergency\s+stop/i,
+      /hey[,\s]+stop\s+everything/i,
+      /stop\s+everything/i,
+      /stop\s+all\s+(?:work|agents?|polecats?)/i,
+      /kill\s+(?:all|everything)/i,
+      /halt\s+(?:all|everything)/i,
+    ],
+  },
 ];
 
 // ============================================================================
@@ -227,6 +239,9 @@ function buildCommand(
 
     case 'show_stats':
       return { command: 'bd', args: ['stats'] };
+
+    case 'emergency_stop':
+      return { command: 'gt', args: ['stop', '--all'] };
 
     default:
       return {};
@@ -337,6 +352,9 @@ function formatSuccessResponse(
     case 'show_cost':
       return output.trim() || 'Cost data not available.';
 
+    case 'emergency_stop':
+      return 'Emergency stop complete. All agents have been halted.';
+
     default:
       return lines[0] || 'Command completed.';
   }
@@ -351,6 +369,9 @@ function formatErrorResponse(intent: CommandIntent, stderr: string): string {
 
     case 'sling_work':
       return `Sling failed: ${firstLine}`;
+
+    case 'emergency_stop':
+      return `Emergency stop failed: ${firstLine}. Agents may still be running.`;
 
     default:
       return `Command failed: ${firstLine}`;
