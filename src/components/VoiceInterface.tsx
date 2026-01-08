@@ -1,13 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   useAutoStartVoice,
   useAudioRecorder,
   useVoiceInteraction,
-  useVoiceServer,
 } from '../hooks/useVoice';
 import { useVoiceContext } from '../hooks/useVoiceContext';
-import { VoiceErrorPanel, detectVoiceErrorType } from './VoiceErrorPanel';
-import { useAudioPlayback } from '../hooks/useAudioPlayback';
 
 type VoiceMode = 'ptt' | 'live';
 
@@ -23,24 +20,74 @@ interface VoiceInterfaceProps {
   defaultMode?: VoiceMode;
 }
 
+class AudioStreamPlayer {
+  private context: AudioContext | null = null;
+  private nextStartTime = 0;
+  private closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  enqueue(base64Chunk: string, sampleRate: number) {
+    if (!base64Chunk) {
+      return;
+    }
+    if (!this.context || this.context.sampleRate !== sampleRate) {
+      this.reset(sampleRate);
+    }
+    if (!this.context) {
+      return;
+    }
+    const samples = decodeAudioChunk(base64Chunk);
+    if (samples.length === 0) {
+      return;
+    }
+    const buffer = this.context.createBuffer(1, samples.length, sampleRate);
+    buffer.copyToChannel(samples, 0);
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.context.destination);
+    const startAt = Math.max(this.context.currentTime, this.nextStartTime);
+    source.start(startAt);
+    this.nextStartTime = startAt + buffer.duration;
+  }
+
+  reset(sampleRate: number) {
+    this.stop();
+    this.context = new AudioContext({ sampleRate });
+    this.nextStartTime = this.context.currentTime;
+  }
+
+  stop() {
+    if (!this.context) {
+      return;
+    }
+    const context = this.context;
+    const delay = Math.max(0, this.nextStartTime - context.currentTime);
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer);
+    }
+    this.closeTimer = setTimeout(() => {
+      context.close();
+    }, (delay + 0.05) * 1000);
+    this.context = null;
+    this.nextStartTime = 0;
+  }
+}
+
+function decodeAudioChunk(base64Chunk: string): Float32Array {
+  const binaryString = atob(base64Chunk);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Float32Array(bytes.buffer);
+}
+
 export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceInterfaceProps) {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [isHolding, setIsHolding] = useState(false);
   const [mode, setMode] = useState<VoiceMode>(defaultMode);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-
-  // Audio playback with state tracking and interrupt support
-  const {
-    isPlaying: isSpeaking,
-    enqueue: enqueueAudio,
-    interrupt: interruptAudio,
-    stop: stopAudio,
-    reset: resetAudio,
-  } = useAudioPlayback();
-
-  // Voice server control for retry functionality
-  const { start: startServer } = useVoiceServer();
+  const audioStreamRef = useRef<AudioStreamPlayer | null>(null);
 
   // Auto-start voice server with loading progress
   const {
@@ -84,6 +131,12 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    return () => {
+      audioStreamRef.current?.stop();
+    };
+  }, []);
+
   // Process recorded audio when recording stops
   useEffect(() => {
     if (!isRecording && audioBase64 && !isProcessing) {
@@ -108,8 +161,8 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     };
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
-    // Reset audio player for new response
-    resetAudio();
+    audioStreamRef.current?.stop();
+    audioStreamRef.current = new AudioStreamPlayer();
     let assistantText = '';
 
     try {
@@ -125,7 +178,7 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           );
         },
         onAudioChunk: (chunk, sampleRate) => {
-          enqueueAudio(chunk, sampleRate);
+          audioStreamRef.current?.enqueue(chunk, sampleRate);
         },
         onDone: () => {
           setMessages((prev) =>
@@ -133,14 +186,14 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
               msg.id === userId ? { ...msg, text: '(voice input)' } : msg
             )
           );
-          stopAudio();
+          audioStreamRef.current?.stop();
         },
         onError: () => {
-          stopAudio();
+          audioStreamRef.current?.stop();
         },
       });
     } catch {
-      stopAudio();
+      audioStreamRef.current?.stop();
     } finally {
       clearRecording();
     }
@@ -194,64 +247,6 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     }
   };
 
-  const error = serverError || recorderError || interactionError;
-  const errorType = detectVoiceErrorType(error ? String(error) : null);
-
-  // Retry handler for voice errors
-  const handleRetry = useCallback(() => {
-    // For server errors, try to restart the server
-    if (errorType === 'server_not_running' || errorType === 'model_not_found') {
-      startServer(undefined);
-    }
-    // For mic permission, user needs to manually grant permission and retry
-    // The retry will attempt to get media again
-  }, [errorType, startServer]);
-
-  // Text fallback handler when voice is not working
-  const handleTextFallback = useCallback(async (text: string) => {
-    // Add user message
-    const userMessage: VoiceMessage = {
-      id: crypto.randomUUID(),
-      type: 'user',
-      text,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-
-    try {
-      // Use the speak function to get a response (it will call the LLM with text)
-      // Note: This uses TTS which requires the server to be running
-      // For a true fallback, we might need a text-only endpoint
-      const response = await sendVoice(
-        // Create a silent audio placeholder - the server should handle text-only mode
-        '', // Empty audio triggers text-only mode
-        'text',
-        `${systemPrompt}\n\nUser said: ${text}`
-      );
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          type: 'assistant',
-          text: response.text,
-          timestamp: new Date(),
-        },
-      ]);
-    } catch {
-      // If server is down, show a helpful message
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          type: 'assistant',
-          text: 'Voice server is unavailable. Please try the retry button or check the setup steps.',
-          timestamp: new Date(),
-        },
-      ]);
-    }
-  }, [sendVoice, systemPrompt]);
-
   const handleLiveToggle = () => {
     if (!status?.ready || isProcessing) {
       return;
@@ -272,6 +267,8 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
       stopRecording();
     }
   }, [mode, isRecording, stopRecording]);
+
+  const error = serverError || recorderError || interactionError;
 
   return (
     <div className="voice-interface">
@@ -326,13 +323,8 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
       </div>
 
       {error && (
-        <div className="voice-error-container">
-          <VoiceErrorPanel
-            error={String(error)}
-            onRetry={handleRetry}
-            onTextFallback={handleTextFallback}
-            isRetrying={isStarting}
-          />
+        <div className="voice-error">
+          {String(error)}
         </div>
       )}
 
@@ -356,37 +348,13 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
             </time>
           </div>
         ))}
-        {isProcessing && !isSpeaking && (
+        {isProcessing && (
           <div className="message assistant processing" role="status" aria-live="polite">
             <div className="message-content">Thinking...</div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Speaking indicator with interrupt button */}
-      {isSpeaking && (
-        <div className="speaking-indicator" role="status" aria-live="polite">
-          <div className="speaking-waves">
-            <span className="wave" />
-            <span className="wave" />
-            <span className="wave" />
-            <span className="wave" />
-            <span className="wave" />
-          </div>
-          <span className="speaking-text">Speaking...</span>
-          <button
-            className="interrupt-btn"
-            onClick={interruptAudio}
-            aria-label="Stop speaking"
-            title="Interrupt (click to stop)"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          </button>
-        </div>
-      )}
 
       <div className="voice-controls" role="region" aria-label="Voice recording controls">
         {mode === 'ptt' ? (
@@ -589,11 +557,6 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           color: white;
         }
 
-        .voice-error-container {
-          padding: 12px 16px;
-        }
-
-        /* Legacy error style (kept for backwards compatibility) */
         .voice-error {
           padding: 8px 16px;
           background: #e94560;
@@ -816,82 +779,6 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
         .vad-indicator .mic-icon svg {
           width: 20px;
           height: 20px;
-        }
-
-        /* Speaking indicator styles */
-        .speaking-indicator {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          padding: 12px 16px;
-          background: linear-gradient(135deg, #e94560 0%, #d63850 100%);
-          border-radius: 8px;
-          margin: 0 16px 8px;
-        }
-
-        .speaking-waves {
-          display: flex;
-          align-items: center;
-          gap: 3px;
-          height: 20px;
-        }
-
-        .speaking-waves .wave {
-          width: 3px;
-          height: 8px;
-          background: white;
-          border-radius: 2px;
-          animation: speaking-wave 0.8s ease-in-out infinite;
-        }
-
-        .speaking-waves .wave:nth-child(1) { animation-delay: 0s; }
-        .speaking-waves .wave:nth-child(2) { animation-delay: 0.1s; }
-        .speaking-waves .wave:nth-child(3) { animation-delay: 0.2s; }
-        .speaking-waves .wave:nth-child(4) { animation-delay: 0.3s; }
-        .speaking-waves .wave:nth-child(5) { animation-delay: 0.4s; }
-
-        @keyframes speaking-wave {
-          0%, 100% {
-            height: 8px;
-          }
-          50% {
-            height: 20px;
-          }
-        }
-
-        .speaking-text {
-          color: white;
-          font-size: 13px;
-          font-weight: 500;
-        }
-
-        .interrupt-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 28px;
-          height: 28px;
-          border: none;
-          border-radius: 6px;
-          background: rgba(255, 255, 255, 0.2);
-          color: white;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .interrupt-btn:hover {
-          background: rgba(255, 255, 255, 0.3);
-          transform: scale(1.05);
-        }
-
-        .interrupt-btn:active {
-          transform: scale(0.95);
-        }
-
-        .interrupt-btn svg {
-          width: 14px;
-          height: 14px;
         }
       `}</style>
     </div>

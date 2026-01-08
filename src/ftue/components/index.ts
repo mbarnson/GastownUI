@@ -6,3 +6,4 @@ export { CommandBlock, InstallInstructions, PathFixInstructions } from './Comman
 export { WelcomeScene } from './WelcomeScene'
 export { MusicToggle, MusicIndicator } from './MusicToggle'
 export { GoInstallStep } from './GoInstallStep'
+export { CelebrationScene } from './CelebrationScene'

@@ -300,10 +300,8 @@ export default function Header() {
         </nav>
 
         {/* Accessibility Settings */}
-        <div className="p-4 border-t border-gray-700 space-y-3">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Accessibility</p>
+        <div className="p-4 border-t border-gray-700">
           <CalmModeToggle showLabel={true} />
-          <SimplifyModeToggle showLabel={true} />
         </div>
       </aside>
     </>

@@ -2,8 +2,13 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 import Header from '../components/Header'
+import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
+import { SidebarModeProvider } from '../contexts/SidebarModeContext'
+
+import appCss from '../styles.css?url'
 
 import appCss from '../styles.css?url'
 
@@ -11,6 +16,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000,
+      retry: 1,
       refetchOnWindowFocus: false,
     },
   },
@@ -47,8 +53,26 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
-        <QueryClientProvider client={queryClient}>
+      <CalmModeProvider>
+        <RootBody>{children}</RootBody>
+      </CalmModeProvider>
+    </html>
+  )
+}
+
+function RootBody({ children }: { children: React.ReactNode }) {
+  const { isCalm } = useCalmMode()
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual'
+    }
+    window.scrollTo(0, 0)
+  }, [])
+
+  return (
+    <body className={isCalm ? 'calm-mode' : ''}>
+      <QueryClientProvider client={queryClient}>
+        <SidebarModeProvider>
           <Header />
           {children}
           <TanStackDevtools
@@ -62,9 +86,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               },
             ]}
           />
-        </QueryClientProvider>
-        <Scripts />
-      </body>
-    </html>
+          <Scripts />
+        </SidebarModeProvider>
+      </QueryClientProvider>
+    </body>
   )
 }
