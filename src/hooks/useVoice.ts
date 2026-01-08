@@ -183,7 +183,11 @@ export function useVoiceInteraction() {
   const [lastResponse, setLastResponse] = useState<VoiceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const sendVoice = useCallback(async (audioBase64: string, mode?: string) => {
+  const sendVoice = useCallback(async (
+    audioBase64: string,
+    mode?: string,
+    customSystemPrompt?: string
+  ) => {
     setIsProcessing(true);
     setError(null);
 
@@ -191,6 +195,7 @@ export function useVoiceInteraction() {
       const response = await invoke<VoiceResponse>('send_voice_input', {
         audioBase64,
         mode,
+        customSystemPrompt,
       });
       setLastResponse(response);
 

@@ -226,6 +226,7 @@ pub async fn send_voice_input(
     state: State<'_, VoiceServerState>,
     audio_base64: String,
     mode: Option<String>,
+    custom_system_prompt: Option<String>,
 ) -> Result<VoiceResponse, String> {
     // Extract values before any async operations
     let (url, is_ready) = {
@@ -239,10 +240,16 @@ pub async fn send_voice_input(
     }
 
     let mode = mode.unwrap_or_else(|| "interleaved".to_string());
-    let system_prompt = match mode.as_str() {
-        "asr" => SYSTEM_PROMPT_ASR,
-        "tts" => SYSTEM_PROMPT_TTS,
-        _ => SYSTEM_PROMPT_INTERLEAVED,
+
+    // Use custom system prompt if provided, otherwise use mode-based defaults
+    let system_prompt: &str = if let Some(ref custom) = custom_system_prompt {
+        custom.as_str()
+    } else {
+        match mode.as_str() {
+            "asr" => SYSTEM_PROMPT_ASR,
+            "tts" => SYSTEM_PROMPT_TTS,
+            _ => SYSTEM_PROMPT_INTERLEAVED,
+        }
     };
 
     let client = reqwest::Client::new();

@@ -5,6 +5,7 @@ import {
   useVADRecorder,
   useVoiceInteraction,
 } from '../hooks/useVoice';
+import { useVoiceContext } from '../hooks/useVoiceContext';
 
 type VoiceMode = 'ptt' | 'vad';
 
@@ -34,6 +35,13 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
     loadingMessage,
     error: serverError,
   } = useAutoStartVoice(autoStart);
+
+  // Gas Town context for voice model (refreshes every 2s)
+  const {
+    context,
+    systemPrompt,
+    isSignificantlyStale,
+  } = useVoiceContext({ enabled: status?.ready });
 
   // Push-to-talk recorder
   const {
@@ -92,7 +100,8 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      const response = await sendVoice(audio, 'interleaved');
+      // Use context-aware system prompt for voice interactions
+      const response = await sendVoice(audio, 'interleaved', systemPrompt);
 
       // Update user message with transcription (if available in future)
       // and add assistant response
@@ -170,7 +179,15 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
   return (
     <div className="voice-interface">
       <div className="voice-header">
-        <h3>Voice Assistant</h3>
+        <div className="voice-title">
+          <h3>Voice Assistant</h3>
+          {status?.ready && (
+            <div
+              className={`context-health-dot ${context.townHealth} ${isSignificantlyStale ? 'stale' : ''}`}
+              title={`Town: ${context.townHealth}${isSignificantlyStale ? ' (stale)' : ''}`}
+            />
+          )}
+        </div>
         <div className="voice-status">
           {!status?.running ? (
             <div className="loading-indicator">
@@ -314,11 +331,47 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           border-bottom: 1px solid #0f3460;
         }
 
+        .voice-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
         .voice-header h3 {
           margin: 0;
           color: #e94560;
           font-size: 14px;
           font-weight: 600;
+        }
+
+        .context-health-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #4ecca3;
+          transition: background-color 0.3s;
+        }
+
+        .context-health-dot.green {
+          background: #4ecca3;
+        }
+
+        .context-health-dot.yellow {
+          background: #f9c846;
+        }
+
+        .context-health-dot.red {
+          background: #e94560;
+          animation: health-pulse 1s ease-in-out infinite;
+        }
+
+        .context-health-dot.stale {
+          opacity: 0.5;
+        }
+
+        @keyframes health-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
 
         .voice-status .status {
