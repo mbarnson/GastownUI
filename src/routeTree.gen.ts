@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TmuxRouteImport } from './routes/tmux'
 import { Route as MoleculesRouteImport } from './routes/molecules'
+import { Route as FtueRouteImport } from './routes/ftue'
 import { Route as DesignRouteImport } from './routes/design'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -31,6 +32,11 @@ const TmuxRoute = TmuxRouteImport.update({
 const MoleculesRoute = MoleculesRouteImport.update({
   id: '/molecules',
   path: '/molecules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FtueRoute = FtueRouteImport.update({
+  id: '/ftue',
+  path: '/ftue',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignRoute = DesignRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
+  '/ftue': typeof FtueRoute
   '/molecules': typeof MoleculesRoute
   '/tmux': typeof TmuxRoute
   '/rig/$rigId': typeof RigRigIdRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
+  '/ftue': typeof FtueRoute
   '/molecules': typeof MoleculesRoute
   '/tmux': typeof TmuxRoute
   '/rig/$rigId': typeof RigRigIdRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
+  '/ftue': typeof FtueRoute
   '/molecules': typeof MoleculesRoute
   '/tmux': typeof TmuxRoute
   '/rig/$rigId': typeof RigRigIdRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/design'
+    | '/ftue'
     | '/molecules'
     | '/tmux'
     | '/rig/$rigId'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/design'
+    | '/ftue'
     | '/molecules'
     | '/tmux'
     | '/rig/$rigId'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/design'
+    | '/ftue'
     | '/molecules'
     | '/tmux'
     | '/rig/$rigId'
@@ -187,6 +199,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   DesignRoute: typeof DesignRoute
+  FtueRoute: typeof FtueRoute
   MoleculesRoute: typeof MoleculesRoute
   TmuxRoute: typeof TmuxRoute
   RigRigIdRoute: typeof RigRigIdRoute
@@ -213,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/molecules'
       fullPath: '/molecules'
       preLoaderRoute: typeof MoleculesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ftue': {
+      id: '/ftue'
+      path: '/ftue'
+      fullPath: '/ftue'
+      preLoaderRoute: typeof FtueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design': {
@@ -299,6 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   DesignRoute: DesignRoute,
+  FtueRoute: FtueRoute,
   MoleculesRoute: MoleculesRoute,
   TmuxRoute: TmuxRoute,
   RigRigIdRoute: RigRigIdRoute,
