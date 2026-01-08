@@ -8,8 +8,31 @@ import type {
   CommandResult,
   TmuxSession,
   ActivityItem,
-  parseBeadList,
 } from '../types/gastown'
+
+// Additional types from rig view
+export interface Polecat {
+  name: string
+  rig: string
+  status: 'active' | 'idle' | 'stuck'
+  currentWork?: string
+  branch?: string
+}
+
+export interface CrewMember {
+  name: string
+  rig: string
+  status: 'active' | 'idle'
+  worktree?: string
+}
+
+export interface MergeQueueItem {
+  id: string
+  branch: string
+  polecat: string
+  status: 'pending' | 'processing' | 'conflict' | 'merged'
+  position: number
+}
 
 // Helper to run gt/bd commands via Tauri
 export async function runCommand(cmd: string, args: string[]): Promise<CommandResult> {
@@ -20,6 +43,9 @@ export async function runCommand(cmd: string, args: string[]): Promise<CommandRe
 function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window
 }
+
+// Check if in browser (for SSR safety)
+const isBrowser = typeof window !== 'undefined'
 
 // Mock data for development without Tauri
 const mockBeads: Bead[] = [
@@ -122,6 +148,48 @@ const mockActivity: ActivityItem[] = [
   },
 ]
 
+// Parse bd list output
+function parseBeadsOutput(output: string): Bead[] {
+  const lines = output.trim().split('\n').filter(Boolean)
+  const beads: Bead[] = []
+
+  for (const line of lines) {
+    // Parse format: "id [Priority] [type] status - title"
+    const match = line.match(/^(\S+)\s+\[P?(\d)\]\s+\[([^\]]+)\]\s+(\w+)\s+-\s+(.+)$/)
+    if (match) {
+      beads.push({
+        id: match[1],
+        priority: parseInt(match[2]),
+        type: match[3] as Bead['type'],
+        status: match[4] as BeadStatus,
+        title: match[5],
+        created: '',
+        updated: '',
+      })
+    }
+  }
+  return beads
+}
+
+// Parse gt polecat list output
+function parsePolecatsOutput(output: string, rigName: string): Polecat[] {
+  const lines = output.trim().split('\n').filter(Boolean)
+  const polecats: Polecat[] = []
+
+  for (const line of lines) {
+    const parts = line.trim().split(/\s+/)
+    if (parts.length >= 1 && parts[0]) {
+      polecats.push({
+        name: parts[0].replace(/[^\w-]/g, ''),
+        rig: rigName,
+        status: line.includes('active') ? 'active' : line.includes('stuck') ? 'stuck' : 'idle',
+        currentWork: undefined,
+      })
+    }
+  }
+  return polecats
+}
+
 // Real-time convoy status (2s polling)
 export function useConvoys() {
   return useQuery({
@@ -137,63 +205,105 @@ export function useConvoys() {
         return []
       }
 
-      // Parse convoy list output
       // TODO: Implement actual parsing when we know the format
       return []
     },
-    refetchInterval: 2000, // Poll every 2s
+    refetchInterval: 2000,
     staleTime: 1000,
   })
 }
 
-// Beads for a rig or all beads
-export function useBeads(status?: BeadStatus) {
+// Fetch all rigs in the town
+export function useRigs() {
   return useQuery({
-    queryKey: ['beads', status],
+    queryKey: ['rigs'],
+    queryFn: async () => {
+      const result = await runCommand('gt', ['rigs'])
+      if (result.exit_code !== 0) {
+        throw new Error(result.stderr || 'Failed to list rigs')
+      }
+      return result.stdout.trim().split('\n').filter(Boolean)
+    },
+    refetchInterval: 10000,
+    enabled: isBrowser,
+  })
+}
+
+// Beads for dashboard (status filter) or rig view (rig filter)
+export function useBeads(rigOrStatus?: string, status?: BeadStatus) {
+  return useQuery({
+    queryKey: ['beads', rigOrStatus, status],
     queryFn: async (): Promise<Bead[]> => {
       if (!isTauri()) {
-        return status
-          ? mockBeads.filter((b) => b.status === status)
+        const filterStatus = status || (rigOrStatus as BeadStatus)
+        return filterStatus
+          ? mockBeads.filter((b) => b.status === filterStatus)
           : mockBeads
       }
 
       const args = ['list']
-      if (status) {
-        args.push('--status', status)
+      const filterStatus = status || rigOrStatus
+      if (filterStatus && ['open', 'in_progress', 'closed'].includes(filterStatus)) {
+        args.push('--status', filterStatus)
       }
 
       const result = await runCommand('bd', args)
-      if (result.exit_code !== 0) {
+      if (result.exit_code !== 0 && !result.stdout) {
         console.warn('bd list failed:', result.stderr)
         return []
       }
 
-      // Parse bead list output
-      const beads: Bead[] = []
-      const lines = result.stdout.trim().split('\n').filter(Boolean)
+      return parseBeadsOutput(result.stdout)
+    },
+    refetchInterval: 5000,
+    staleTime: 2000,
+    enabled: isBrowser,
+  })
+}
 
-      for (const line of lines) {
-        // Format: ga-xxx [P2] [type] status - title
-        const match = line.match(
-          /^(\S+)\s+\[P(\d)\]\s+\[(\w+)\]\s+(\w+)\s+-\s+(.+)$/
-        )
-        if (match) {
-          beads.push({
-            id: match[1],
-            priority: parseInt(match[2]),
-            type: match[3] as Bead['type'],
-            status: match[4] as BeadStatus,
-            title: match[5],
-            created: '',
-            updated: '',
+// Fetch polecats for a rig
+export function usePolecats(rig: string) {
+  return useQuery({
+    queryKey: ['polecats', rig],
+    queryFn: async () => {
+      const result = await runCommand('gt', ['polecat', 'list', rig])
+      if (result.exit_code !== 0 && !result.stdout) {
+        throw new Error(result.stderr || 'Failed to list polecats')
+      }
+      return parsePolecatsOutput(result.stdout, rig)
+    },
+    refetchInterval: 5000,
+    enabled: isBrowser,
+  })
+}
+
+// Fetch merge queue status for a rig
+export function useMergeQueue(rig: string) {
+  return useQuery({
+    queryKey: ['mergeQueue', rig],
+    queryFn: async () => {
+      const result = await runCommand('gt', ['refinery', 'queue', rig])
+      if (result.exit_code !== 0 && !result.stdout) {
+        return [] as MergeQueueItem[]
+      }
+      const items: MergeQueueItem[] = []
+      const lines = result.stdout.trim().split('\n').filter(Boolean)
+      lines.forEach((line, idx) => {
+        const parts = line.split(/\s+/)
+        if (parts.length >= 2) {
+          items.push({
+            id: parts[0],
+            branch: parts[1] || parts[0],
+            polecat: parts[2] || 'unknown',
+            status: 'pending',
+            position: idx + 1,
           })
         }
-      }
-
-      return beads
+      })
+      return items
     },
-    refetchInterval: 5000, // Poll every 5s
-    staleTime: 2000,
+    refetchInterval: 5000,
+    enabled: isBrowser,
   })
 }
 
@@ -211,8 +321,6 @@ export function useTownStatus() {
         runCommand('gt', ['rigs']),
       ])
 
-      // Parse outputs into TownStatus
-      // TODO: Implement actual parsing
       return {
         healthy: statusResult.exit_code === 0,
         rigs: [],
@@ -282,6 +390,8 @@ export function useSling() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['convoys'] })
       queryClient.invalidateQueries({ queryKey: ['beads'] })
+      queryClient.invalidateQueries({ queryKey: ['polecats'] })
+      queryClient.invalidateQueries({ queryKey: ['mergeQueue'] })
     },
   })
 }
@@ -291,16 +401,38 @@ export function useCloseBead() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (beadId: string): Promise<CommandResult> => {
+    mutationFn: async ({ beadId, reason }: { beadId: string; reason?: string }): Promise<CommandResult> => {
       if (!isTauri()) {
         return { stdout: 'Mock close successful', stderr: '', exit_code: 0 }
       }
 
-      return runCommand('bd', ['close', beadId])
+      const args = ['close', beadId]
+      if (reason) {
+        args.push('--reason', reason)
+      }
+      return runCommand('bd', args)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['beads'] })
       queryClient.invalidateQueries({ queryKey: ['activity'] })
+    },
+  })
+}
+
+// Update bead status
+export function useUpdateBead() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ beadId, status }: { beadId: string; status: BeadStatus }) => {
+      const result = await runCommand('bd', ['update', beadId, '--status', status])
+      if (result.exit_code !== 0) {
+        throw new Error(result.stderr || 'Failed to update bead')
+      }
+      return result
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['beads'] })
     },
   })
 }
