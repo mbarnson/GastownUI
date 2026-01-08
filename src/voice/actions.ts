@@ -15,6 +15,7 @@ export type ActionType =
   | 'ask_mayor'
   | 'describe_screen'
   | 'deep_query'
+  | 'emergency_stop'
 
 export interface ParsedAction {
   type: ActionType
@@ -80,7 +81,7 @@ export function hasActions(modelOutput: string): boolean {
  * Validate action type
  */
 function isValidActionType(type: string): type is ActionType {
-  return ['mail', 'sling', 'ask_mayor', 'describe_screen', 'deep_query'].includes(type)
+  return ['mail', 'sling', 'ask_mayor', 'describe_screen', 'deep_query', 'emergency_stop'].includes(type)
 }
 
 /**
@@ -119,6 +120,10 @@ function parseActionArgs(type: ActionType, argsString: string): string[] {
       // Format: query text (entire string is the query)
       return [argsString]
 
+    case 'emergency_stop':
+      // No arguments needed
+      return []
+
     default:
       return argsString.split(/\s+/)
   }
@@ -144,6 +149,9 @@ export async function executeAction(action: ParsedAction): Promise<ActionResult>
 
       case 'deep_query':
         return await executeDeepQuery(action)
+
+      case 'emergency_stop':
+        return await executeEmergencyStop(action)
 
       default:
         return {
@@ -353,5 +361,26 @@ async function executeDeepQuery(action: ParsedAction): Promise<ActionResult> {
     success: true,
     message: `Deep query processing: "${query}" - local reasoning pending`,
     action,
+  }
+}
+
+async function executeEmergencyStop(action: ParsedAction): Promise<ActionResult> {
+  try {
+    await invoke('run_gt_command', {
+      cmd: 'gt',
+      args: ['stop', '--all'],
+    })
+
+    return {
+      success: true,
+      message: 'Emergency stop complete. All Gas Town agents have been halted.',
+      action,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: `Emergency stop failed: ${error instanceof Error ? error.message : String(error)}`,
+      action,
+    }
   }
 }

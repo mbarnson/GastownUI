@@ -720,6 +720,33 @@ export function useRigStatus(rigName: string) {
 }
 
 /**
+ * Stop all Gas Town work (emergency stop)
+ * Calls gt stop --all to halt all agents
+ */
+export function useStopAll() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (): Promise<CommandResult> => {
+      if (!isTauri()) {
+        // Mock response for development
+        return { stdout: 'Mock emergency stop - all agents stopped', stderr: '', exit_code: 0 }
+      }
+
+      return runCommand('gt', ['stop', '--all'])
+    },
+    onSuccess: () => {
+      // Invalidate all queries to refresh state after stop
+      queryClient.invalidateQueries({ queryKey: ['convoys'] })
+      queryClient.invalidateQueries({ queryKey: ['beads'] })
+      queryClient.invalidateQueries({ queryKey: ['polecats'] })
+      queryClient.invalidateQueries({ queryKey: ['townStatus'] })
+      queryClient.invalidateQueries({ queryKey: ['activity'] })
+    },
+  })
+}
+
+/**
  * Hook for fetching multiple rig statuses for comparison
  */
 export function useRigComparison(rigNames: string[]) {
