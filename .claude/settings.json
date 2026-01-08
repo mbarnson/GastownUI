@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '\\n=== UI SANITY CHECK REMINDER ===\\nBefore completing, you MUST verify:\\n1. npm run build succeeds\\n2. npm run tauri:dev launches without crash\\n3. Header shows Gas Town banner (not TanStack logo)\\n4. No React error overlays\\n\\nRun: npm run verify:ui (if available)\\nOr manually verify with: npm run tauri:dev\\n================================\\n'"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(cargo build *)",
+      "Bash(git *)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep"
+    ]
+  }
+}
