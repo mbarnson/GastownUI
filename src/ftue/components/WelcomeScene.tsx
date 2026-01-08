@@ -1,9 +1,11 @@
+import { useEffect, useRef } from 'react'
 import { Logo } from './Logo'
 import { SetupChecklist } from './SetupChecklist'
 import { MicrophoneIndicator } from './MicrophoneIndicator'
 import { MusicToggle } from './MusicToggle'
 import type { FTUEState } from '../types'
 import { getChecklistFromSetup } from '../types'
+import { useFTUEVoice } from '../../hooks/useFTUEVoice'
 
 interface WelcomeSceneProps {
   state: FTUEState
@@ -20,6 +22,33 @@ export function WelcomeScene({
   onToggleVoice,
 }: WelcomeSceneProps) {
   const checklist = getChecklistFromSetup(state.setupState)
+  const hasPlayedRef = useRef(false)
+
+  // Initialize FTUE voice - plays welcome clip on mount
+  const { playClip, isPlaying, isLoading } = useFTUEVoice({
+    onClipEnd: (clipId) => {
+      if (clipId === 'welcome') {
+        // After welcome clip, could auto-advance or wait for user
+      }
+    },
+    onError: (error) => {
+      console.warn('FTUE voice error:', error)
+    },
+  })
+
+  // Play welcome clip on mount (once)
+  useEffect(() => {
+    if (!isLoading && state.voiceEnabled && !hasPlayedRef.current) {
+      hasPlayedRef.current = true
+      // Small delay for smoother UX
+      const timer = setTimeout(() => {
+        playClip('welcome').catch(() => {
+          // Error handled in useFTUEVoice
+        })
+      }, 800)
+      return () => clearTimeout(timer)
+    }
+  }, [isLoading, state.voiceEnabled, playClip])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col relative">
@@ -42,6 +71,7 @@ export function WelcomeScene({
         {/* Voice indicator */}
         <MicrophoneIndicator
           enabled={state.voiceEnabled}
+          isSpeaking={isPlaying}
           onToggle={onToggleVoice}
         />
 
