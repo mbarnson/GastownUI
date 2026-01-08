@@ -204,18 +204,22 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
               </div>
             </div>
           ) : (
-            <div className="mode-toggle">
+            <div className="mode-toggle" role="radiogroup" aria-label="Voice input mode">
               <button
                 className={`mode-btn ${mode === 'ptt' ? 'active' : ''}`}
                 onClick={() => setMode('ptt')}
-                title="Push-to-Talk: Hold Space or button"
+                role="radio"
+                aria-checked={mode === 'ptt'}
+                aria-label="Push-to-Talk mode: Hold Space or button to record"
               >
                 PTT
               </button>
               <button
                 className={`mode-btn ${mode === 'vad' ? 'active' : ''}`}
                 onClick={() => setMode('vad')}
-                title="Voice Activity Detection: Auto-detects speech"
+                role="radio"
+                aria-checked={mode === 'vad'}
+                aria-label="Voice Activity Detection mode: Auto-detects speech"
               >
                 VAD
               </button>
@@ -230,27 +234,34 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
         </div>
       )}
 
-      <div className="voice-messages">
+      <div
+        className="voice-messages"
+        role="log"
+        aria-live="polite"
+        aria-label="Voice conversation"
+      >
         {messages.map((msg) => (
           <div
             key={msg.id}
             className={`message ${msg.type}`}
+            role="article"
+            aria-label={`${msg.type === 'user' ? 'You' : 'Assistant'} at ${msg.timestamp.toLocaleTimeString()}`}
           >
             <div className="message-content">{msg.text}</div>
-            <div className="message-time">
+            <time className="message-time" dateTime={msg.timestamp.toISOString()}>
               {msg.timestamp.toLocaleTimeString()}
-            </div>
+            </time>
           </div>
         ))}
         {isProcessing && (
-          <div className="message assistant processing">
+          <div className="message assistant processing" role="status" aria-live="polite">
             <div className="message-content">Thinking...</div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="voice-controls">
+      <div className="voice-controls" role="region" aria-label="Voice recording controls">
         {mode === 'ptt' ? (
           <>
             <button
@@ -263,6 +274,8 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
               onTouchStart={handleRecordStart}
               onTouchEnd={handleRecordEnd}
               disabled={!status?.ready || isProcessing}
+              aria-label={isRecording ? 'Release to send voice message' : 'Hold to record voice message'}
+              aria-pressed={isRecording}
             >
               <div className="mic-icon">
                 {isRecording ? (
@@ -428,7 +441,7 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           font-weight: 600;
           cursor: pointer;
           background: transparent;
-          color: #888;
+          color: #94a3b8; /* slate-400 - AA compliant */
           transition: all 0.2s;
         }
 
@@ -543,7 +556,7 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
 
         .voice-hint {
           font-size: 12px;
-          color: #888;
+          color: #94a3b8; /* slate-400 - AA compliant */
         }
 
         .btn {
@@ -636,7 +649,7 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #888;
+          color: #94a3b8; /* slate-400 - AA compliant */
           transition: all 0.3s;
         }
 

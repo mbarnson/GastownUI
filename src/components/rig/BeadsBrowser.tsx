@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useId } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -25,6 +25,7 @@ import {
   Atom,
 } from 'lucide-react'
 import type { Bead } from '../../hooks/useGastown'
+import { focusRingClasses } from '../../lib/a11y'
 
 interface BeadsBrowserProps {
   beads: Bead[]
@@ -60,14 +61,15 @@ const typeConfig: Record<string, { icon: typeof Bug; color: string }> = {
 }
 
 const priorityColors: Record<string, string> = {
-  P0: 'text-red-500 bg-red-500/20',
-  P1: 'text-orange-400 bg-orange-400/20',
-  P2: 'text-yellow-400 bg-yellow-400/20',
+  P0: 'text-red-400 bg-red-500/20',
+  P1: 'text-amber-400 bg-amber-400/20',
+  P2: 'text-yellow-300 bg-yellow-400/20',
   P3: 'text-blue-400 bg-blue-400/20',
-  P4: 'text-gray-400 bg-gray-400/20',
+  P4: 'text-slate-300 bg-slate-400/20', // AA compliant
 }
 
 export default function BeadsBrowser({ beads, rigId: _rigId }: BeadsBrowserProps) {
+  const searchId = useId()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -209,60 +211,79 @@ export default function BeadsBrowser({ beads, rigId: _rigId }: BeadsBrowserProps
   }, [beads])
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-5 lg:col-span-2">
+    <section
+      className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-5 lg:col-span-2"
+      aria-labelledby="beads-browser-heading"
+    >
       <div className="flex items-center gap-3 mb-4">
-        <Gem className="w-5 h-5 text-cyan-400" />
-        <h2 className="text-lg font-semibold text-white">Beads Browser</h2>
-        <span className="ml-auto text-sm text-gray-400">
+        <Gem className="w-5 h-5 text-cyan-400" aria-hidden="true" />
+        <h2 id="beads-browser-heading" className="text-lg font-semibold text-white">
+          Beads Browser
+        </h2>
+        <span className="ml-auto text-sm text-slate-300" role="status" aria-live="polite">
           {filteredBeads.length} of {beads.length} beads
         </span>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4" role="search">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <label htmlFor={searchId} className="sr-only">
+            Search beads by ID, title, or type
+          </label>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
           <input
-            type="text"
+            id={searchId}
+            type="search"
             placeholder="Search beads..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+            className={`w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 text-sm focus:outline-none focus:border-cyan-500 transition-colors ${focusRingClasses}`}
+            aria-describedby="search-results-count"
           />
         </div>
 
         {/* Status filter */}
-        <div className="flex items-center gap-1 bg-slate-700 rounded-lg p-1">
-          <Filter className="w-4 h-4 text-gray-400 ml-2" />
-          {(['all', 'open', 'in_progress', 'closed'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`
-                px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                ${statusFilter === status
-                  ? 'bg-cyan-600 text-white'
-                  : 'text-gray-300 hover:bg-slate-600'
-                }
-              `}
-            >
-              {status === 'all' ? 'All' : status === 'in_progress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)}
-              <span className="ml-1 text-xs opacity-70">
-                ({statusCounts[status]})
-              </span>
-            </button>
-          ))}
+        <div
+          className="flex items-center gap-1 bg-slate-700 rounded-lg p-1"
+          role="radiogroup"
+          aria-label="Filter by status"
+        >
+          <Filter className="w-4 h-4 text-slate-400 ml-2" aria-hidden="true" />
+          {(['all', 'open', 'in_progress', 'closed'] as const).map((status) => {
+            const displayName = status === 'all' ? 'All' : status === 'in_progress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)
+            return (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                role="radio"
+                aria-checked={statusFilter === status}
+                className={`
+                  px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${focusRingClasses}
+                  ${statusFilter === status
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-slate-200 hover:bg-slate-600'
+                  }
+                `}
+              >
+                {displayName}
+                <span className="ml-1 text-xs opacity-80" aria-label={`${statusCounts[status]} ${displayName.toLowerCase()} beads`}>
+                  ({statusCounts[status]})
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
       {/* Table */}
       {filteredBeads.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <Gem className="w-10 h-10 mx-auto mb-2 opacity-50" />
+        <div className="text-center py-12 text-slate-400" role="status">
+          <Gem className="w-10 h-10 mx-auto mb-2 opacity-50" aria-hidden="true" />
           <p>No beads found</p>
           {globalFilter && (
-            <p className="text-sm mt-1">Try adjusting your search</p>
+            <p className="text-sm mt-1 text-slate-500">Try adjusting your search</p>
           )}
         </div>
       ) : (
@@ -308,6 +329,6 @@ export default function BeadsBrowser({ beads, rigId: _rigId }: BeadsBrowserProps
           </table>
         </div>
       )}
-    </div>
+    </section>
   )
 }
