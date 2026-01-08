@@ -79,6 +79,9 @@ fn check_go() -> DependencyInfo {
 /// Minimum required gt version
 const MIN_GT_VERSION: &str = "0.1.0";
 
+/// Minimum required bd version
+const MIN_BD_VERSION: &str = "0.43.0";
+
 /// Check gt CLI installation with version comparison
 fn check_gt() -> DependencyInfo {
     let (installed, version, path) = check_command("gt", &["--version"]);
@@ -132,17 +135,59 @@ fn compare_versions(v1: &str, v2: &str) -> i32 {
     0
 }
 
-/// Check bd CLI installation
+/// Check if GOPATH/bin is in PATH, return warning message if not
+fn check_gopath_in_path() -> Option<String> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let home = dirs::home_dir()?;
+
+    // Common Go bin locations
+    let gopath_bin = home.join("go").join("bin");
+    let gobin = std::env::var("GOBIN").ok().map(PathBuf::from);
+
+    // Check if either is in PATH
+    let path_parts: Vec<&str> = path.split(':').collect();
+
+    let gopath_in_path = path_parts.iter().any(|p| {
+        let p = PathBuf::from(p);
+        p == gopath_bin || gobin.as_ref().map(|gb| p == *gb).unwrap_or(false)
+    });
+
+    if gopath_in_path {
+        None
+    } else {
+        Some(format!(
+            "Add {} to your PATH. For bash/zsh: `echo 'export PATH=$HOME/go/bin:$PATH' >> ~/.zshrc`",
+            gopath_bin.display()
+        ))
+    }
+}
+
+/// Check bd CLI installation with version comparison
 fn check_bd() -> DependencyInfo {
     let (installed, version, path) = check_command("bd", &["--version"]);
 
+    // Check if version meets minimum requirement
+    let version_ok = version.as_ref().map(|v| {
+        // Parse version string (e.g., "bd version 0.43.0" or "0.43.0")
+        let ver_str = v.split_whitespace()
+            .find(|s| s.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+            .unwrap_or("0.0.0");
+        compare_versions(ver_str, MIN_BD_VERSION) >= 0
+    }).unwrap_or(false);
+
+    let install_instructions = if installed && !version_ok {
+        format!("Update bd: `go install github.com/mbarnson/beads/cmd/bd@latest` (current version outdated, need >= {})", MIN_BD_VERSION)
+    } else {
+        "Install bd: `go install github.com/mbarnson/beads/cmd/bd@latest`".to_string()
+    };
+
     DependencyInfo {
         name: "bd (Beads CLI)".to_string(),
-        installed,
+        installed: installed && version_ok,
         version,
         path,
-        install_url: "https://github.com/txgsync/beads".to_string(),
-        install_instructions: "Install bd: `go install github.com/txgsync/beads/cmd/bd@latest`".to_string(),
+        install_url: "https://github.com/mbarnson/beads".to_string(),
+        install_instructions,
     }
 }
 
@@ -310,16 +355,24 @@ pub async fn install_dependency(name: String) -> Result<InstallResult, String> {
         "bd" | "beads" => {
             // Try to install bd via go install
             let output = Command::new("go")
-                .args(["install", "github.com/txgsync/beads/cmd/bd@latest"])
+                .args(["install", "github.com/mbarnson/beads/cmd/bd@latest"])
                 .output()
                 .map_err(|e| format!("Failed to run go install: {}", e))?;
 
             if output.status.success() {
+                // Check if GOPATH/bin is in PATH
+                let path_warning = check_gopath_in_path();
+                let voice_response = if path_warning.is_some() {
+                    format!("bd is installed, but you may need to add Go's bin directory to your PATH. {}. Then say 'check setup' to verify.", path_warning.unwrap())
+                } else {
+                    "Nice! bd is installed. Now you need a Gas Town workspace. Say 'create workspace' to set one up.".to_string()
+                };
+
                 Ok(InstallResult {
                     success: true,
                     message: "bd installed successfully".to_string(),
                     next_step: Some("create workspace".to_string()),
-                    voice_response: "Nice! bd is installed. Now you need a Gas Town workspace. Say 'create workspace' to set one up.".to_string(),
+                    voice_response,
                 })
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
