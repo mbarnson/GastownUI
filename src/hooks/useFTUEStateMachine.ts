@@ -119,6 +119,82 @@ export type FTUEAction =
   | { type: 'COMPLETE' }
   | { type: 'RESET' }
 
+// ============== Storage Key ==============
+
+const FTUE_STORAGE_KEY = 'gastownui-ftue-progress'
+
+/**
+ * Persisted state subset - only persist stable, resumable state
+ * Don't persist transient states like downloading progress
+ */
+interface PersistedFTUEState {
+  phase: FTUEPhase
+  voiceState: VoiceState
+  consent: ConsentState
+  completedAt?: string  // ISO timestamp when FTUE completed
+}
+
+/**
+ * Load persisted state from localStorage
+ */
+function loadPersistedState(): Partial<PersistedFTUEState> | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const stored = localStorage.getItem(FTUE_STORAGE_KEY)
+    if (!stored) return null
+
+    const parsed = JSON.parse(stored) as PersistedFTUEState
+
+    // Don't restore transient phases - restart from checking
+    if (parsed.phase === 'workspace_creating' || parsed.phase === 'checking') {
+      return { ...parsed, phase: 'checking' }
+    }
+
+    // If FTUE was completed, check if we should skip it
+    if (parsed.phase === 'complete' && parsed.completedAt) {
+      return parsed
+    }
+
+    return parsed
+  } catch (e) {
+    console.warn('Failed to load FTUE state from localStorage:', e)
+    return null
+  }
+}
+
+/**
+ * Save state to localStorage
+ */
+function savePersistedState(state: FTUEState): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    const toSave: PersistedFTUEState = {
+      phase: state.phase,
+      voiceState: state.voiceState,
+      consent: state.consent,
+      completedAt: state.phase === 'complete' ? new Date().toISOString() : undefined,
+    }
+    localStorage.setItem(FTUE_STORAGE_KEY, JSON.stringify(toSave))
+  } catch (e) {
+    console.warn('Failed to save FTUE state to localStorage:', e)
+  }
+}
+
+/**
+ * Clear persisted state (for reset)
+ */
+function clearPersistedState(): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    localStorage.removeItem(FTUE_STORAGE_KEY)
+  } catch (e) {
+    console.warn('Failed to clear FTUE state from localStorage:', e)
+  }
+}
+
 // ============== Initial State ==============
 
 const initialDownloadProgress: DownloadProgress = {
@@ -380,6 +456,30 @@ export function useFTUEStateMachine(options: UseFTUEStateMachineOptions = {}) {
   const { skipVoice = false, requireConsent = false, autoStart = true } = options
 
   const [state, setState] = useState<FTUEState>(() => {
+    // Try to load persisted state
+    const persisted = loadPersistedState()
+
+    if (persisted) {
+      // If FTUE was completed, start in complete state
+      if (persisted.phase === 'complete') {
+        return computeDerivedState({
+          ...initialState,
+          phase: 'complete',
+          voiceState: persisted.voiceState || 'text_only',
+          consent: persisted.consent || initialConsentState,
+        })
+      }
+
+      // Restore partial progress
+      return computeDerivedState({
+        ...initialState,
+        phase: persisted.phase || 'checking',
+        voiceState: persisted.voiceState || 'not_started',
+        consent: persisted.consent || initialConsentState,
+      })
+    }
+
+    // No persisted state - start fresh
     if (requireConsent) {
       return computeDerivedState({ ...initialState, phase: 'needs_consent' })
     }
@@ -388,8 +488,25 @@ export function useFTUEStateMachine(options: UseFTUEStateMachineOptions = {}) {
 
   // Dispatch action to state machine
   const dispatch = useCallback((action: FTUEAction) => {
-    setState((prev) => ftueReducer(prev, action))
+    setState((prev) => {
+      const newState = ftueReducer(prev, action)
+
+      // Clear persisted state on reset
+      if (action.type === 'RESET') {
+        clearPersistedState()
+      }
+
+      return newState
+    })
   }, [])
+
+  // Persist state changes (debounced to avoid excessive writes)
+  useEffect(() => {
+    // Don't persist transient download progress
+    if (state.voiceState === 'downloading') return
+
+    savePersistedState(state)
+  }, [state.phase, state.voiceState, state.consent])
 
   // Query hooks for external state
   const { data: setupStatus, refetch: refetchSetup } = useSetupStatus()
@@ -504,6 +621,12 @@ export function useFTUEStateMachine(options: UseFTUEStateMachineOptions = {}) {
     }
   }, [autoStart, state.phase, refetchSetup])
 
+  // Check if FTUE was previously completed
+  const wasCompleted = useMemo(() => {
+    const persisted = loadPersistedState()
+    return persisted?.phase === 'complete'
+  }, [])
+
   return {
     state,
     actions,
@@ -519,6 +642,9 @@ export function useFTUEStateMachine(options: UseFTUEStateMachineOptions = {}) {
     canProceed: state.canProceed,
     showTransition: state.showTheatricalTransition,
     error: state.errorMessage,
+    // Persistence helpers
+    wasCompleted,
+    isComplete: state.phase === 'complete',
   }
 }
 
