@@ -4,7 +4,6 @@ import { VoiceInterface } from '../components/VoiceInterface'
 import { SelfTestPanel } from '../components/SelfTestPanel'
 import TmuxPanel from '../components/TmuxPanel'
 import { DeepQueryPanel } from '../components/DeepQueryPanel'
-import { MoleculeVisualizer, DEMO_MOLECULE } from '../components/MoleculeVisualizer'
 import { SetupBanner } from '../components/SetupBanner'
 import { useConvoys, useBeads, useStopAll } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
@@ -102,16 +101,21 @@ function Dashboard() {
               {molecules && molecules.length > 0 ? (
                 <div className="space-y-4">
                   {molecules.map((mol) => (
-                    <MoleculeVisualizer key={mol.id} molecule={mol} compact />
+                    <div key={mol.id} className="p-4 bg-slate-700/50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-white">{mol.name}</span>
+                        <span className="text-sm text-gray-400">{mol.progress}%</span>
+                      </div>
+                      {mol.description && (
+                        <p className="text-sm text-gray-400 mt-1">{mol.description}</p>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <p className="text-gray-400 text-sm mb-4">
-                    No active workflows. Showing demo visualization:
-                  </p>
-                  <MoleculeVisualizer molecule={DEMO_MOLECULE} />
-                </div>
+                <p className="text-gray-400 text-sm">
+                  No active workflows.
+                </p>
               )}
             </section>
 

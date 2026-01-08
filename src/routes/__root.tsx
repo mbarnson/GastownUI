@@ -7,20 +7,14 @@ import { useEffect } from 'react'
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SidebarModeProvider } from '../contexts/SidebarModeContext'
-import { SimplifyModeProvider } from '../contexts/SimplifyModeContext'
-import { FTUEProvider } from '../contexts/FTUEContext'
-import { AudioProvider } from '../components/ftue/AudioManager'
-import { LiveRegionProvider } from '../components/a11y/LiveRegion'
-import { SkipLink } from '../components/a11y/AccessibleElement'
 
 import appCss from '../styles.css?url'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000,
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
     },
   },
 })
@@ -36,7 +30,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'GAS TOWN',
+        title: 'GastownUI - Gas Town Dashboard',
       },
     ],
     links: [
@@ -57,15 +51,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <CalmModeProvider>
-        <SimplifyModeProvider>
-          <FTUEProvider>
-            <AudioProvider>
-              <LiveRegionProvider>
-                <RootBody>{children}</RootBody>
-              </LiveRegionProvider>
-            </AudioProvider>
-          </FTUEProvider>
-        </SimplifyModeProvider>
+        <RootBody>{children}</RootBody>
       </CalmModeProvider>
     </html>
   )
