@@ -11,6 +11,7 @@ import {
   Server,
   Users,
   Mic,
+  Plus,
 } from 'lucide-react'
 import {
   useConvoys,
@@ -19,6 +20,8 @@ import {
   useBeads,
 } from '../hooks/useGastown'
 import TmuxPanel from '../components/TmuxPanel'
+import QuickCreateModal, { useQuickCreate } from '../components/QuickCreateModal'
+import { formatShortcut, shortcuts } from '../hooks/useKeyboardShortcut'
 import type { Convoy, ActivityItem, Bead, TownStatus as TownStatusType } from '../types/gastown'
 
 export const Route = createFileRoute('/dashboard')({ component: Dashboard })
@@ -28,9 +31,24 @@ function Dashboard() {
   const { data: convoys, isLoading: convoysLoading } = useConvoys()
   const { data: activity, isLoading: activityLoading } = useActivityFeed()
   const { data: beads } = useBeads()
+  const quickCreate = useQuickCreate()
+
+  const handleCreateBead = (bead: { title: string; type: string; priority: number }) => {
+    // In production, this would call the API
+    console.log('Creating bead:', bead)
+    // Could add to activity feed or refetch beads
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-6">
+      {/* Quick Create Modal */}
+      <QuickCreateModal
+        isOpen={quickCreate.isOpen}
+        onClose={quickCreate.close}
+        onCreate={handleCreateBead}
+        defaultRig="GastownUI"
+      />
+
       {/* Header */}
       <header className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
@@ -40,6 +58,18 @@ function Dashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-4">
+          {/* Quick Create Button */}
+          <button
+            onClick={quickCreate.open}
+            className="flex items-center gap-2 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors"
+            title={`Quick Create (${formatShortcut(shortcuts.quickCreate.key, shortcuts.quickCreate.modifiers)})`}
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">New</span>
+            <kbd className="hidden sm:inline px-1.5 py-0.5 bg-cyan-700 rounded text-xs">
+              {formatShortcut(shortcuts.quickCreate.key, shortcuts.quickCreate.modifiers)}
+            </kbd>
+          </button>
           <CostTracker status={townStatus} />
           <HealthIndicator status={townStatus} loading={townLoading} />
         </div>
