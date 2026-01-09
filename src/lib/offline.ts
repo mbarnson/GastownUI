@@ -19,6 +19,8 @@ export interface CachedData<T> {
   expiresAt?: number;
 }
 
+export type OperationStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
 export interface QueuedOperation {
   id: string;
   type: string;
@@ -26,6 +28,7 @@ export interface QueuedOperation {
   timestamp: number;
   retries: number;
   maxRetries: number;
+  status: OperationStatus;
 }
 
 export interface OfflineState {
@@ -33,7 +36,10 @@ export interface OfflineState {
   networkStatus: NetworkStatus;
   lastOnline: number | null;
   queuedOperations: number;
+  /** Alias for queuedOperations for component compatibility */
+  pendingOperations: number;
   cacheSize: number;
+  lastSync: number | null;
 }
 
 // ============================================================================
@@ -347,6 +353,7 @@ class OperationQueue {
   private queue: QueuedOperation[] = [];
   private processing: boolean = false;
   private listeners: Set<() => void> = new Set();
+  private lastSyncTime: number | null = null;
 
   constructor() {
     // Load queue from storage
@@ -358,6 +365,14 @@ class OperationQueue {
         this.processQueue();
       }
     });
+  }
+
+  getLastSync(): number | null {
+    return this.lastSyncTime;
+  }
+
+  isProcessing(): boolean {
+    return this.processing;
   }
 
   private loadQueue(): void {
@@ -400,6 +415,7 @@ class OperationQueue {
       timestamp: Date.now(),
       retries: 0,
       maxRetries,
+      status: 'pending',
     };
 
     this.queue.push(operation);
@@ -452,21 +468,34 @@ class OperationQueue {
     }
 
     this.processing = true;
+    this.notifyListeners();
 
     while (this.queue.length > 0 && networkMonitor.isOnline()) {
       const operation = this.queue[0];
 
       try {
+        // Mark as processing
+        operation.status = 'processing';
+        this.saveQueue();
+
         // Dispatch operation to handlers
         await this.executeOperation(operation);
+
+        // Mark completed and remove
+        operation.status = 'completed';
+        this.lastSyncTime = Date.now();
         this.queue.shift();
         this.saveQueue();
       } catch (error) {
         operation.retries++;
         if (operation.retries >= operation.maxRetries) {
-          // Max retries reached, remove from queue
+          // Max retries reached, mark as failed and remove from queue
+          operation.status = 'failed';
           console.error(`Operation ${operation.id} failed after ${operation.retries} retries`);
           this.queue.shift();
+        } else {
+          // Reset to pending for retry
+          operation.status = 'pending';
         }
         this.saveQueue();
         break; // Stop processing on error
@@ -474,6 +503,7 @@ class OperationQueue {
     }
 
     this.processing = false;
+    this.notifyListeners();
   }
 
   private async executeOperation(operation: QueuedOperation): Promise<void> {
@@ -527,22 +557,28 @@ export function useIsOnline(): boolean {
  * Hook to get full offline state
  */
 export function useOfflineState(): OfflineState {
+  const queueLength = operationQueue.getLength();
   const [state, setState] = useState<OfflineState>({
     isOnline: networkMonitor.isOnline(),
     networkStatus: networkMonitor.getStatus(),
     lastOnline: networkMonitor.getLastOnline(),
-    queuedOperations: operationQueue.getLength(),
+    queuedOperations: queueLength,
+    pendingOperations: queueLength,
     cacheSize: dataCache.getSize(),
+    lastSync: operationQueue.getLastSync(),
   });
 
   useEffect(() => {
     const update = () => {
+      const qLen = operationQueue.getLength();
       setState({
         isOnline: networkMonitor.isOnline(),
         networkStatus: networkMonitor.getStatus(),
         lastOnline: networkMonitor.getLastOnline(),
-        queuedOperations: operationQueue.getLength(),
+        queuedOperations: qLen,
+        pendingOperations: qLen,
         cacheSize: dataCache.getSize(),
+        lastSync: operationQueue.getLastSync(),
       });
     };
 
@@ -627,10 +663,12 @@ export function useOfflineQueue(): {
   isProcessing: boolean;
 } {
   const [queue, setQueue] = useState<QueuedOperation[]>(operationQueue.getQueue());
+  const [isProcessing, setIsProcessing] = useState(operationQueue.isProcessing());
 
   useEffect(() => {
     return operationQueue.subscribe(() => {
       setQueue(operationQueue.getQueue());
+      setIsProcessing(operationQueue.isProcessing());
     });
   }, []);
 
@@ -638,7 +676,7 @@ export function useOfflineQueue(): {
     enqueue: useCallback((type, payload) => operationQueue.enqueue(type, payload), []),
     queue,
     clear: useCallback(() => operationQueue.clear(), []),
-    isProcessing: false,
+    isProcessing,
   };
 }
 
