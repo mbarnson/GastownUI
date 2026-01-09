@@ -5,6 +5,8 @@ import {
   useVoiceInteraction,
 } from '../hooks/useVoice';
 import { useVoiceContext } from '../hooks/useVoiceContext';
+import { useVoiceModelStatus } from '../hooks/useVoiceModel';
+import { VoiceModelSetup } from './VoiceModelSetup';
 
 type VoiceMode = 'ptt' | 'live';
 
@@ -81,22 +83,76 @@ function decodeAudioChunk(base64Chunk: string): Float32Array {
   return new Float32Array(bytes.buffer);
 }
 
+// Extracted styles constant for reuse in multiple return paths
+const voiceInterfaceStyles = `
+  .voice-interface {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #1a1a2e;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .voice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #16213e;
+    border-bottom: 1px solid #0f3460;
+  }
+  .voice-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .voice-header h3 {
+    margin: 0;
+    color: #e94560;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .voice-status .status {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .voice-status .status.loading {
+    background: #0f3460;
+    color: #f9c846;
+  }
+  .voice-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+`;
+
 export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceInterfaceProps) {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [isHolding, setIsHolding] = useState(false);
   const [mode, setMode] = useState<VoiceMode>(defaultMode);
+  const [showModelSetup, setShowModelSetup] = useState(false);
+  const [modelSetupDismissed, setModelSetupDismissed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const audioStreamRef = useRef<AudioStreamPlayer | null>(null);
 
-  // Auto-start voice server with loading progress
+  // Check if voice model is installed
+  const { data: modelStatus, isLoading: modelStatusLoading } = useVoiceModelStatus();
+  const modelInstalled = modelStatus?.installed ?? false;
+
+  // Auto-start voice server only if model is installed
   const {
     status,
     isStarting,
     loadingProgress,
     loadingMessage,
     error: serverError,
-  } = useAutoStartVoice(autoStart);
+  } = useAutoStartVoice(autoStart && modelInstalled);
 
   // Gas Town context for voice model (refreshes every 2s)
   const {
@@ -268,6 +324,76 @@ export function VoiceInterface({ autoStart = true, defaultMode = 'ptt' }: VoiceI
   }, [mode, isRecording, stopRecording]);
 
   const error = serverError || recorderError || interactionError;
+
+  // Show model setup if model is not installed
+  if (showModelSetup || (!modelInstalled && !modelStatusLoading && !modelSetupDismissed)) {
+    return (
+      <VoiceModelSetup
+        compact
+        onComplete={() => {
+          setShowModelSetup(false);
+          setModelSetupDismissed(false);
+        }}
+        onDismiss={() => {
+          setShowModelSetup(false);
+          setModelSetupDismissed(true);
+        }}
+      />
+    );
+  }
+
+  // Show loading state while checking model status
+  if (modelStatusLoading) {
+    return (
+      <div className="voice-interface">
+        <div className="voice-header">
+          <div className="voice-title">
+            <h3>Voice Assistant</h3>
+          </div>
+          <div className="voice-status">
+            <span className="status loading">Checking model...</span>
+          </div>
+        </div>
+        <div className="voice-messages" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p style={{ color: '#94a3b8', fontSize: '14px' }}>Checking voice model status...</p>
+        </div>
+        <style>{voiceInterfaceStyles}</style>
+      </div>
+    );
+  }
+
+  // Show prompt to enable voice if model not installed
+  if (!modelInstalled && modelSetupDismissed) {
+    return (
+      <div className="voice-interface">
+        <div className="voice-header">
+          <div className="voice-title">
+            <h3>Voice Assistant</h3>
+          </div>
+        </div>
+        <div className="voice-messages" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '24px' }}>
+          <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '16px' }}>
+            Voice model not installed. Download the model to enable voice features.
+          </p>
+          <button
+            onClick={() => setShowModelSetup(true)}
+            style={{
+              padding: '8px 16px',
+              background: '#e94560',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            Setup Voice
+          </button>
+        </div>
+        <style>{voiceInterfaceStyles}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="voice-interface">

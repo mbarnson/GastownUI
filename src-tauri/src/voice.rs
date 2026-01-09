@@ -73,6 +73,293 @@ pub struct VoiceServerStatus {
     pub url: String,
 }
 
+// ============================================================================
+// Voice Model Management
+// ============================================================================
+
+/// Status of a single model file
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelFileStatus {
+    pub name: String,
+    pub path: String,
+    pub exists: bool,
+    pub size_bytes: Option<u64>,
+    pub expected_size_bytes: u64,
+}
+
+/// Overall voice model status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceModelStatus {
+    pub installed: bool,
+    pub model_dir: String,
+    pub files: Vec<ModelFileStatus>,
+    pub server_binary_exists: bool,
+    pub missing_files: Vec<String>,
+}
+
+/// Information about a downloadable model file
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelFileInfo {
+    pub id: String,
+    pub name: String,
+    pub filename: String,
+    pub url: String,
+    pub size_bytes: u64,
+    pub sha256: Option<String>,
+}
+
+/// Complete model download info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceModelInfo {
+    pub model_name: String,
+    pub quantization: String,
+    pub total_size_bytes: u64,
+    pub model_dir: String,
+    pub files: Vec<ModelFileInfo>,
+}
+
+/// Disk space info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiskSpaceInfo {
+    pub available_bytes: u64,
+    pub total_bytes: u64,
+    pub required_bytes: u64,
+    pub has_sufficient_space: bool,
+}
+
+/// Model file definitions with expected sizes (Q4_0 quantization)
+/// Note: Sizes are approximate and will be verified during download
+const MODEL_FILES: &[(&str, &str, u64)] = &[
+    ("model", "LFM2.5-Audio-1.5B-Q4_0.gguf", 1_100_000_000),        // ~1.1GB
+    ("mmproj", "mmproj-LFM2.5-Audio-1.5B-Q4_0.gguf", 350_000_000),  // ~350MB
+    ("vocoder", "vocoder-LFM2.5-Audio-1.5B-Q4_0.gguf", 150_000_000), // ~150MB
+    ("tokenizer", "tokenizer-LFM2.5-Audio-1.5B-Q4_0.gguf", 5_000_000), // ~5MB
+];
+
+/// Server binary relative path
+const SERVER_BINARY_PATH: &str = "runners/llama-liquid-audio-macos-arm64/llama-liquid-audio-server";
+
+/// Hugging Face base URL for model files
+const HF_MODEL_REPO: &str = "lfm-audio/LFM2.5-Audio-1.5B-GGUF";
+
+fn get_model_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_default()
+        .join(".cache/huggingface/models/LFM2.5-Audio-1.5B-GGUF")
+}
+
+/// Check if voice model files are installed
+#[tauri::command]
+pub async fn check_voice_model_status() -> Result<VoiceModelStatus, String> {
+    let model_dir = get_model_dir();
+    let quant = "Q4_0";
+
+    let mut files = Vec::new();
+    let mut missing_files = Vec::new();
+    let mut all_exist = true;
+
+    for (name, filename_template, expected_size) in MODEL_FILES {
+        let filename = filename_template.replace("Q4_0", quant);
+        let path = model_dir.join(&filename);
+        let exists = path.exists();
+
+        let size_bytes = if exists {
+            std::fs::metadata(&path).ok().map(|m| m.len())
+        } else {
+            None
+        };
+
+        if !exists {
+            all_exist = false;
+            missing_files.push(filename.clone());
+        }
+
+        files.push(ModelFileStatus {
+            name: name.to_string(),
+            path: path.to_string_lossy().to_string(),
+            exists,
+            size_bytes,
+            expected_size_bytes: *expected_size,
+        });
+    }
+
+    // Check server binary
+    let server_path = model_dir.join(SERVER_BINARY_PATH);
+    let server_exists = server_path.exists();
+
+    if !server_exists {
+        all_exist = false;
+        missing_files.push(SERVER_BINARY_PATH.to_string());
+    }
+
+    Ok(VoiceModelStatus {
+        installed: all_exist && server_exists,
+        model_dir: model_dir.to_string_lossy().to_string(),
+        files,
+        server_binary_exists: server_exists,
+        missing_files,
+    })
+}
+
+/// Get voice model download info
+#[tauri::command]
+pub async fn get_voice_model_info() -> Result<VoiceModelInfo, String> {
+    let model_dir = get_model_dir();
+    let quant = "Q4_0";
+
+    let mut files = Vec::new();
+    let mut total_size: u64 = 0;
+
+    for (id, filename_template, size) in MODEL_FILES {
+        let filename = filename_template.replace("Q4_0", quant);
+        let url = format!(
+            "https://huggingface.co/{}/resolve/main/{}",
+            HF_MODEL_REPO, filename
+        );
+
+        files.push(ModelFileInfo {
+            id: id.to_string(),
+            name: id.to_string(),
+            filename: filename.clone(),
+            url,
+            size_bytes: *size,
+            sha256: None, // Would need to be fetched from HF metadata
+        });
+
+        total_size += size;
+    }
+
+    // Add server binary
+    let server_url = format!(
+        "https://huggingface.co/{}/resolve/main/{}",
+        HF_MODEL_REPO, SERVER_BINARY_PATH
+    );
+
+    files.push(ModelFileInfo {
+        id: "server".to_string(),
+        name: "Server Binary".to_string(),
+        filename: SERVER_BINARY_PATH.to_string(),
+        url: server_url,
+        size_bytes: 50_000_000, // ~50MB estimate
+        sha256: None,
+    });
+
+    total_size += 50_000_000;
+
+    Ok(VoiceModelInfo {
+        model_name: "LFM2.5-Audio-1.5B".to_string(),
+        quantization: quant.to_string(),
+        total_size_bytes: total_size,
+        model_dir: model_dir.to_string_lossy().to_string(),
+        files,
+    })
+}
+
+/// Check available disk space for model download
+#[tauri::command]
+pub async fn check_disk_space(required_bytes: Option<u64>) -> Result<DiskSpaceInfo, String> {
+    let model_dir = get_model_dir();
+
+    // Get the mount point for the model directory (or home if it doesn't exist yet)
+    let check_path = if model_dir.exists() {
+        model_dir
+    } else {
+        dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::ffi::CString;
+        use std::mem::MaybeUninit;
+
+        let path_cstr = CString::new(check_path.to_string_lossy().as_bytes())
+            .map_err(|e| format!("Invalid path: {}", e))?;
+
+        let mut stat: MaybeUninit<libc::statfs> = MaybeUninit::uninit();
+
+        let result = unsafe { libc::statfs(path_cstr.as_ptr(), stat.as_mut_ptr()) };
+
+        if result != 0 {
+            return Err("Failed to get disk space info".to_string());
+        }
+
+        let stat = unsafe { stat.assume_init() };
+        let block_size = stat.f_bsize as u64;
+        let available_bytes = stat.f_bavail as u64 * block_size;
+        let total_bytes = stat.f_blocks as u64 * block_size;
+
+        // Default required bytes based on model size (~1.7GB with buffer)
+        let required = required_bytes.unwrap_or(2_000_000_000);
+
+        Ok(DiskSpaceInfo {
+            available_bytes,
+            total_bytes,
+            required_bytes: required,
+            has_sufficient_space: available_bytes >= required,
+        })
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Fallback for other platforms - assume sufficient space
+        let required = required_bytes.unwrap_or(2_000_000_000);
+        Ok(DiskSpaceInfo {
+            available_bytes: 100_000_000_000, // 100GB placeholder
+            total_bytes: 500_000_000_000,      // 500GB placeholder
+            required_bytes: required,
+            has_sufficient_space: true,
+        })
+    }
+}
+
+/// Prepare model directory for downloads (create if needed)
+#[tauri::command]
+pub async fn prepare_voice_model_directory() -> Result<String, String> {
+    let model_dir = get_model_dir();
+
+    // Create the model directory
+    tokio::fs::create_dir_all(&model_dir)
+        .await
+        .map_err(|e| format!("Failed to create model directory: {}", e))?;
+
+    // Create the server binary directory
+    let server_dir = model_dir.join("runners/llama-liquid-audio-macos-arm64");
+    tokio::fs::create_dir_all(&server_dir)
+        .await
+        .map_err(|e| format!("Failed to create server directory: {}", e))?;
+
+    Ok(model_dir.to_string_lossy().to_string())
+}
+
+/// Make the server binary executable after download
+#[tauri::command]
+pub async fn make_server_executable() -> Result<(), String> {
+    let model_dir = get_model_dir();
+    let server_path = model_dir.join(SERVER_BINARY_PATH);
+
+    if !server_path.exists() {
+        return Err("Server binary not found".to_string());
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&server_path)
+            .map_err(|e| format!("Failed to get permissions: {}", e))?
+            .permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&server_path, perms)
+            .map_err(|e| format!("Failed to set permissions: {}", e))?;
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceStreamPayload {
