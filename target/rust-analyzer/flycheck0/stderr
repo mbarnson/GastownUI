@@ -1,9 +1,102 @@
-   0.177060917s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui_lib"}: cargo::core::compiler::fingerprint: dependency on `build_script_build` is newer than we are 1767848383.493862489s > 1767848321.006706821s "/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri"
-   0.177725625s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui_lib"}: cargo::core::compiler::fingerprint: fingerprint dirty for gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)/Check { test: false }/TargetInner { ..: lib_target("gastownui_lib", ["staticlib", "cdylib", "rlib"], "/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/src/lib.rs", Edition2021) }
-   0.177737959s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui_lib"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDependency { name: "build_script_build", dep_mtime: FileTime { seconds: 1767848383, nanos: 493862489 }, max_mtime: FileTime { seconds: 1767848321, nanos: 6706821 } })
-   0.224081792s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint: fingerprint dirty for gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)/Check { test: false }/TargetInner { name: "gastownui", doc: true, ..: with_path("/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/src/main.rs", Edition2021) }
-   0.224093459s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "gastownui_lib" })
-   0.225082542s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint: fingerprint dirty for gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)/Check { test: true }/TargetInner { name: "gastownui", doc: true, ..: with_path("/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/src/main.rs", Edition2021) }
-   0.225087084s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "gastownui_lib" })
+   0.160532708s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui_lib"}: cargo::core::compiler::fingerprint: fingerprint error for gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)/Check { test: false }/TargetInner { ..: lib_target("gastownui_lib", ["staticlib", "cdylib", "rlib"], "/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/src/lib.rs", Edition2021) }
+   0.160557583s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/target/debug/.fingerprint/gastownui-b622f9fd07b45215/lib-gastownui_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.215859208s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui_lib"}: cargo::core::compiler::fingerprint: fingerprint error for gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)/Check { test: true }/TargetInner { ..: lib_target("gastownui_lib", ["staticlib", "cdylib", "rlib"], "/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/src/lib.rs", Edition2021) }
+   0.215872833s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/target/debug/.fingerprint/gastownui-7e1a3757de59bd2d/test-lib-gastownui_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.216642625s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint: fingerprint error for gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)/Check { test: false }/TargetInner { name: "gastownui", doc: true, ..: with_path("/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/src/main.rs", Edition2021) }
+   0.216646375s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/target/debug/.fingerprint/gastownui-10812f9298949354/bin-gastownui`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.217335458s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint: fingerprint error for gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)/Check { test: true }/TargetInner { name: "gastownui", doc: true, ..: with_path("/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/src/main.rs", Edition2021) }
+   0.217338250s  INFO prepare_target{force=false package_id=gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri) target="gastownui"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri/target/debug/.fingerprint/gastownui-feb20465b4399686/test-bin-gastownui`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
     Checking gastownui v0.1.0 (/Users/patbarnson/gt/GastownUI/refinery/rig/src-tauri)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.79s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.01s

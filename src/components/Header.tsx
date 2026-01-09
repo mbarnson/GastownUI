@@ -24,6 +24,7 @@ import SimplifyModeToggle from './a11y/SimplifyModeToggle'
 import { ThemeSelector } from './ThemeToggle'
 import { useConvoys, useTmuxSessions } from '../hooks/useGastown'
 import { useSidebarMode } from '../contexts/SidebarModeContext'
+import { OfflineStatusBadge } from './OfflineIndicator'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -55,6 +56,7 @@ export default function Header() {
             </h1>
           </div>
           <div className="flex flex-1 flex-wrap items-center justify-end gap-4 text-sm text-white/90 text-right drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]">
+            <OfflineStatusBadge />
             <span className="px-2 py-1 bg-black/35 text-white text-xs font-medium rounded">
               Active
             </span>

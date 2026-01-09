@@ -8,6 +8,7 @@ import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SidebarModeProvider } from '../contexts/SidebarModeContext'
 import { ThemeProvider, themeScript } from '../hooks/useTheme'
+import { OfflineToast, useOfflineToast } from '../components/OfflineIndicator'
 
 import appCss from '../styles.css?url'
 
@@ -64,6 +65,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function RootBody({ children }: { children: React.ReactNode }) {
   const { isCalm } = useCalmMode()
+  const { showToast, dismiss } = useOfflineToast()
+
   useEffect(() => {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual'
@@ -77,6 +80,7 @@ function RootBody({ children }: { children: React.ReactNode }) {
         <SidebarModeProvider>
           <Header />
           {children}
+          {showToast && <OfflineToast onDismiss={dismiss} />}
           <TanStackDevtools
             config={{
               position: 'bottom-right',
