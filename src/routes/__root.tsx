@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import Header from '../components/Header'
 import { CalmModeProvider, useCalmMode } from '../contexts/CalmModeContext'
 import { SidebarModeProvider } from '../contexts/SidebarModeContext'
+import { ThemeProvider, themeScript } from '../hooks/useTheme'
 
 import appCss from '../styles.css?url'
 
@@ -49,10 +50,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        {/* Prevent flash of unstyled content - runs before React hydration */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <CalmModeProvider>
-        <RootBody>{children}</RootBody>
-      </CalmModeProvider>
+      <ThemeProvider defaultTheme="system">
+        <CalmModeProvider>
+          <RootBody>{children}</RootBody>
+        </CalmModeProvider>
+      </ThemeProvider>
     </html>
   )
 }

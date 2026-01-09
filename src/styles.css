@@ -49,10 +49,61 @@ code {
   --app-surface-70: rgba(255, 255, 255, 0.75);
   --app-surface-80: rgba(255, 255, 255, 0.85);
   --app-surface-90: rgba(255, 255, 255, 0.92);
+  /* Light mode shadows - softer, more diffuse */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 15px rgba(0, 0, 0, 0.03);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
+/* Light mode via class (explicit selection) */
+:root.light {
+  --header-bg: #f5f5f7;
+  --header-border: #d1d1d6;
+  --header-text: #1c1c1e;
+  --header-muted: #6e6e73;
+  --header-accent: #d70015;
+  --header-pill-bg: rgba(52, 199, 89, 0.18);
+  --header-pill-text: #1f7a3b;
+  --header-hover: rgba(0, 0, 0, 0.06);
+  --header-query-bg: rgba(0, 122, 255, 0.16);
+  --header-query-text: #007aff;
+  --header-selftest-bg: rgba(255, 159, 10, 0.18);
+  --header-selftest-text: #b35c00;
+  --app-bg: #f5f5f7;
+  --app-surface: #ffffff;
+  --app-surface-alt: #f2f2f7;
+  --app-surface-strong: #e5e5ea;
+  --app-surface-deep: #d1d1d6;
+  --app-border: #d1d1d6;
+  --app-border-strong: #c7c7cc;
+  --app-text: #1c1c1e;
+  --app-text-strong: #2c2c2e;
+  --app-text-muted: #6e6e73;
+  --app-text-subtle: #8e8e93;
+  --app-text-faint: #aeaeb2;
+  --app-bg-50: rgba(245, 245, 247, 0.6);
+  --app-bg-70: rgba(245, 245, 247, 0.7);
+  --app-bg-80: rgba(245, 245, 247, 0.8);
+  --app-surface-30: rgba(255, 255, 255, 0.35);
+  --app-surface-50: rgba(255, 255, 255, 0.6);
+  --app-surface-70: rgba(255, 255, 255, 0.75);
+  --app-surface-80: rgba(255, 255, 255, 0.85);
+  --app-surface-90: rgba(255, 255, 255, 0.92);
+  /* Light mode shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 15px rgba(0, 0, 0, 0.03);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Dark mode via system preference (fallback) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --header-bg: #1c1c1e;
     --header-border: #2c2c2e;
     --header-text: #f2f2f7;
@@ -85,7 +136,57 @@ code {
     --app-surface-70: rgba(44, 44, 46, 0.75);
     --app-surface-80: rgba(44, 44, 46, 0.85);
     --app-surface-90: rgba(44, 44, 46, 0.92);
+    /* Elegant dark mode shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 15px rgba(255, 255, 255, 0.05);
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
+}
+
+/* Dark mode via class (explicit selection) - overrides system preference */
+:root.dark {
+  --header-bg: #1c1c1e;
+  --header-border: #2c2c2e;
+  --header-text: #f2f2f7;
+  --header-muted: #8e8e93;
+  --header-accent: #ff453a;
+  --header-pill-bg: rgba(48, 209, 88, 0.18);
+  --header-pill-text: #30d158;
+  --header-hover: rgba(255, 255, 255, 0.08);
+  --header-query-bg: rgba(10, 132, 255, 0.2);
+  --header-query-text: #0a84ff;
+  --header-selftest-bg: rgba(255, 159, 10, 0.2);
+  --header-selftest-text: #ff9f0a;
+  --app-bg: #1c1c1e;
+  --app-surface: #2c2c2e;
+  --app-surface-alt: #3a3a3c;
+  --app-surface-strong: #3a3a3c;
+  --app-surface-deep: #48484a;
+  --app-border: #3a3a3c;
+  --app-border-strong: #48484a;
+  --app-text: #f2f2f7;
+  --app-text-strong: #e5e5ea;
+  --app-text-muted: #8e8e93;
+  --app-text-subtle: #636366;
+  --app-text-faint: #48484a;
+  --app-bg-50: rgba(28, 28, 30, 0.6);
+  --app-bg-70: rgba(28, 28, 30, 0.7);
+  --app-bg-80: rgba(28, 28, 30, 0.8);
+  --app-surface-30: rgba(44, 44, 46, 0.35);
+  --app-surface-50: rgba(44, 44, 46, 0.6);
+  --app-surface-70: rgba(44, 44, 46, 0.75);
+  --app-surface-80: rgba(44, 44, 46, 0.85);
+  --app-surface-90: rgba(44, 44, 46, 0.92);
+  /* Elegant dark mode shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 15px rgba(255, 255, 255, 0.05);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 body {

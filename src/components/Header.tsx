@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import CalmModeToggle from './a11y/CalmModeToggle'
 import SimplifyModeToggle from './a11y/SimplifyModeToggle'
+import { ThemeSelector } from './ThemeToggle'
 import { useConvoys, useTmuxSessions } from '../hooks/useGastown'
 import { useSidebarMode } from '../contexts/SidebarModeContext'
 
@@ -299,9 +300,20 @@ export default function Header() {
           {/* Demo Links End */}
         </nav>
 
-        {/* Accessibility Settings */}
-        <div className="p-4 border-t border-gray-700">
-          <CalmModeToggle showLabel={true} />
+        {/* Accessibility & Theme Settings */}
+        <div className="p-4 border-t border-gray-700 space-y-4">
+          <div>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Theme
+            </h3>
+            <ThemeSelector />
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Accessibility
+            </h3>
+            <CalmModeToggle showLabel={true} />
+          </div>
         </div>
       </aside>
     </>
