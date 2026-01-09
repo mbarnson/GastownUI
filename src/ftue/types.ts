@@ -3,6 +3,7 @@
 /** Steps in the FTUE flow */
 export type FTUEStep =
   | 'welcome'
+  | 'quick_setup'           // Tools installed but no workspace - skip to workspace creation
   | 'checking_prerequisites'
   | 'install_go'
   | 'waiting_for_go'
@@ -197,9 +198,10 @@ export function determineStartStep(setupState: SetupState): FTUEStep {
     return 'complete'
   }
 
-  // Has tools but no workspace - quick setup
+  // Has tools but no workspace - quick setup flow
+  // Voice: "Looks like you have the tools but no workspace yet."
   if (setupState.hasGtMinVersion && setupState.hasBdMinVersion && !setupState.hasWorkspace) {
-    return 'configure_workspace'
+    return 'quick_setup'
   }
 
   // Has Go but missing tools
