@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Logo } from './Logo'
 import { SetupChecklist } from './SetupChecklist'
 import { MicrophoneIndicator } from './MicrophoneIndicator'
@@ -6,6 +6,7 @@ import { MusicToggle } from './MusicToggle'
 import type { FTUEState } from '../types'
 import { getChecklistFromSetup } from '../types'
 import { useFTUEVoice } from '../../hooks/useFTUEVoice'
+import { TELL_ME_MORE_SCRIPT } from '../voiceScripts'
 
 interface WelcomeSceneProps {
   state: FTUEState
@@ -23,6 +24,8 @@ export function WelcomeScene({
 }: WelcomeSceneProps) {
   const checklist = getChecklistFromSetup(state.setupState)
   const hasPlayedRef = useRef(false)
+  const [showTellMeMore, setShowTellMeMore] = useState(false)
+  const [isSpeakingTellMeMore, setIsSpeakingTellMeMore] = useState(false)
 
   // Initialize FTUE voice - plays welcome clip on mount
   const { playClip, isPlaying, isLoading } = useFTUEVoice({
@@ -35,6 +38,41 @@ export function WelcomeScene({
       console.warn('FTUE voice error:', error)
     },
   })
+
+  // Handle "tell me more" - speak via TTS if voice enabled, always show text
+  const handleTellMeMore = useCallback(() => {
+    setShowTellMeMore(true)
+
+    // Use Web Speech API for TTS if voice is enabled
+    if (state.voiceEnabled && window.speechSynthesis) {
+      // Cancel any existing speech
+      window.speechSynthesis.cancel()
+
+      const utterance = new SpeechSynthesisUtterance(TELL_ME_MORE_SCRIPT)
+      utterance.rate = 0.95
+      utterance.pitch = 1.0
+      utterance.volume = 1.0
+
+      // Try to get a good voice
+      const voices = window.speechSynthesis.getVoices()
+      const preferredVoice = voices.find(
+        (v) =>
+          v.name.includes('Samantha') ||
+          v.name.includes('Karen') ||
+          v.name.includes('Google') ||
+          v.lang.startsWith('en')
+      )
+      if (preferredVoice) {
+        utterance.voice = preferredVoice
+      }
+
+      utterance.onstart = () => setIsSpeakingTellMeMore(true)
+      utterance.onend = () => setIsSpeakingTellMeMore(false)
+      utterance.onerror = () => setIsSpeakingTellMeMore(false)
+
+      window.speechSynthesis.speak(utterance)
+    }
+  }, [state.voiceEnabled])
 
   // Play welcome clip on mount (once)
   useEffect(() => {
@@ -71,9 +109,21 @@ export function WelcomeScene({
         {/* Voice indicator */}
         <MicrophoneIndicator
           enabled={state.voiceEnabled}
-          isSpeaking={isPlaying}
+          isSpeaking={isPlaying || isSpeakingTellMeMore}
           onToggle={onToggleVoice}
         />
+
+        {/* Tell me more expanded content */}
+        {showTellMeMore && (
+          <div className="max-w-xl p-4 bg-slate-800/60 rounded-lg border border-slate-700 text-slate-300 text-sm leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <p className="mb-3">
+              Gas Town is an orchestration system for coding agents—think of it as a factory floor where multiple Claude Code instances work in parallel on your codebase.
+            </p>
+            <p>
+              We need to install two command-line tools: <span className="text-slate-200">Beads</span>, which is a Git-backed issue tracker your agents will use, and <span className="text-slate-200">Gas Town</span> itself, which coordinates everything. Both are open source and install via Go.
+            </p>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 mt-4">
@@ -83,6 +133,14 @@ export function WelcomeScene({
           >
             Let's get started
           </button>
+          {!showTellMeMore && (
+            <button
+              onClick={handleTellMeMore}
+              className="px-6 py-3 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 font-medium rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+            >
+              Tell me more
+            </button>
+          )}
           <button
             onClick={onSkip}
             className="px-6 py-3 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 font-medium rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
