@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { VoiceInterface } from '../components/VoiceInterface'
 import { SelfTestPanel } from '../components/SelfTestPanel'
@@ -15,6 +15,8 @@ import {
   Circle,
   AlertTriangle,
   GitBranch,
+  MessageCircle,
+  X,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
@@ -28,6 +30,9 @@ function Dashboard() {
   const { data: setupStatus, isLoading: setupLoading } = useSetupStatus()
   const { preferences: setupPrefs, isLoaded: prefsLoaded } = useSetupPreferences()
   const stopAll = useStopAll()
+
+  // Mobile sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // Redirect to setup if dependencies are missing (unless setup was skipped)
   useEffect(() => {
@@ -44,13 +49,13 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      <main id="main-content" className="max-w-7xl mx-auto px-6 py-8">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Setup Banner - shown when setup was skipped or interrupted */}
-        <SetupBanner className="mb-6" />
+        <SetupBanner className="mb-4 sm:mb-6" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main content area */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Convoys */}
             <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -161,8 +166,8 @@ function Dashboard() {
             <TmuxPanel />
           </div>
 
-          {/* Voice Interface / Self-Test / Deep Query sidebar */}
-          <div className="lg:col-span-1">
+          {/* Voice Interface / Self-Test / Deep Query sidebar - Desktop */}
+          <div className="hidden lg:block lg:col-span-1">
             <div className="sticky top-6 space-y-6">
               {sidebarMode === 'selfTest' ? (
                 <SelfTestPanel />
@@ -180,10 +185,60 @@ function Dashboard() {
         </div>
       </main>
 
-      {/* Emergency Stop */}
-      <div className="fixed bottom-6 right-6">
+      {/* Mobile sidebar overlay */}
+      <div
+        className={`sidebar-overlay lg:hidden ${isSidebarOpen ? 'open' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* Mobile sidebar panel */}
+      <aside
+        className={`sidebar-panel lg:hidden safe-area-top safe-area-bottom ${isSidebarOpen ? 'open' : ''}`}
+        aria-label="Voice interface panel"
+        aria-hidden={!isSidebarOpen}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800">
+          <h2 className="text-lg font-semibold text-white">
+            {sidebarMode === 'selfTest'
+              ? 'Self Test'
+              : sidebarMode === 'deepQuery'
+                ? 'Deep Query'
+                : 'Voice Interface'}
+          </h2>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="touch-target p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
+            aria-label="Close panel"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4 h-[calc(100%-64px)] overflow-y-auto">
+          {sidebarMode === 'selfTest' ? (
+            <SelfTestPanel />
+          ) : sidebarMode === 'deepQuery' ? (
+            <DeepQueryPanel />
+          ) : (
+            <VoiceInterface />
+          )}
+        </div>
+      </aside>
+
+      {/* Mobile sidebar toggle button */}
+      <button
+        className="sidebar-toggle lg:hidden text-slate-600 hover:text-slate-800"
+        onClick={() => setIsSidebarOpen(true)}
+        aria-label="Open voice interface"
+        aria-expanded={isSidebarOpen}
+      >
+        <MessageCircle className="w-6 h-6" />
+      </button>
+
+      {/* Emergency Stop - positioned above sidebar toggle on mobile */}
+      <div className="fixed bottom-24 right-4 lg:bottom-6 lg:right-6 z-30">
         <button
-          className={`p-4 text-white rounded-full shadow-lg transition-all hover:scale-105 ${
+          className={`touch-target-lg p-3 sm:p-4 text-white rounded-full shadow-lg transition-all hover:scale-105 ${
             stopAll.isPending
               ? 'bg-red-800 cursor-wait shadow-red-800/30'
               : 'bg-red-600 hover:bg-red-700 shadow-red-600/30'
@@ -208,7 +263,7 @@ function Dashboard() {
             }
           }}
         >
-          <AlertTriangle className="w-6 h-6" aria-hidden="true" />
+          <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
         </button>
       </div>
     </div>

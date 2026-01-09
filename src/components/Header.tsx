@@ -21,10 +21,8 @@ import {
 } from 'lucide-react'
 import CalmModeToggle from './a11y/CalmModeToggle'
 import SimplifyModeToggle from './a11y/SimplifyModeToggle'
-import { ThemeSelector } from './ThemeToggle'
 import { useConvoys, useTmuxSessions } from '../hooks/useGastown'
 import { useSidebarMode } from '../contexts/SidebarModeContext'
-import { OfflineStatusBadge } from './OfflineIndicator'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -40,36 +38,37 @@ export default function Header() {
       <header className="relative w-full overflow-hidden border-b border-black/20 shadow-lg">
         <div className="absolute inset-0 bg-[url('/gastown-banner.jpg')] bg-cover bg-center" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/20" />
-        <div className="relative z-10 max-w-7xl mx-auto px-6 py-4 min-h-[96px] sm:min-h-[112px] lg:min-h-[128px] flex flex-wrap items-center gap-4 text-white">
-          <div className="flex items-center gap-4">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 min-h-[72px] sm:min-h-[96px] lg:min-h-[112px] flex flex-wrap items-center gap-2 sm:gap-4 text-white">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => setIsOpen(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="touch-target p-2 hover:bg-white/10 rounded-lg transition-colors"
               aria-label="Open menu"
             >
               <Menu size={24} />
             </button>
-            <h1 className="text-2xl font-black tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight">
               <Link to="/" className="flex items-center">
                 <span className="sr-only">Gas Town</span>
               </Link>
             </h1>
           </div>
-          <div className="flex flex-1 flex-wrap items-center justify-end gap-4 text-sm text-white/90 text-right drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]">
-            <OfflineStatusBadge />
-            <span className="px-2 py-1 bg-black/35 text-white text-xs font-medium rounded">
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:gap-4 text-xs sm:text-sm text-white/90 text-right drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]">
+            <span className="hidden sm:inline-block px-2 py-1 bg-black/35 text-white text-xs font-medium rounded">
               Active
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Activity className="w-4 h-4" />
-              <span>{convoys?.length || 0} Convoys</span>
+              <span>{convoys?.length || 0}</span>
+              <span className="hidden sm:inline">Convoys</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Terminal className="w-4 h-4" />
-              <span>{sessions?.length || 0} Sessions</span>
+              <span>{sessions?.length || 0}</span>
+              <span className="hidden sm:inline">Sessions</span>
             </div>
             <button
-              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+              className={`touch-target flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 rounded transition-colors ${
                 sidebarMode === 'deepQuery'
                   ? 'bg-white/20 text-white'
                   : 'hover:bg-white/10'
@@ -82,10 +81,10 @@ export default function Header() {
               title="Deep Query - AI Analysis"
             >
               <Brain className="w-4 h-4" />
-              <span>Query</span>
+              <span className="hidden sm:inline">Query</span>
             </button>
             <button
-              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+              className={`touch-target flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 rounded transition-colors ${
                 sidebarMode === 'selfTest'
                   ? 'bg-white/20 text-white'
                   : 'hover:bg-white/10'
@@ -98,22 +97,25 @@ export default function Header() {
               title="Voice Self-Test"
             >
               <TestTube2 className="w-4 h-4" />
-              <span>Self-Test</span>
+              <span className="hidden sm:inline">Self-Test</span>
             </button>
           </div>
         </div>
       </header>
 
       <aside
-        className={`fixed top-0 left-0 h-full w-80 bg-gray-900 text-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-[85vw] max-w-80 bg-gray-900 text-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col safe-area-top safe-area-bottom ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold">Navigation</h2>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="touch-target p-2 hover:bg-gray-800 rounded-lg transition-colors"
             aria-label="Close menu"
           >
             <X size={24} />
@@ -302,20 +304,9 @@ export default function Header() {
           {/* Demo Links End */}
         </nav>
 
-        {/* Accessibility & Theme Settings */}
-        <div className="p-4 border-t border-gray-700 space-y-4">
-          <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Theme
-            </h3>
-            <ThemeSelector />
-          </div>
-          <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Accessibility
-            </h3>
-            <CalmModeToggle showLabel={true} />
-          </div>
+        {/* Accessibility Settings */}
+        <div className="p-4 border-t border-gray-700">
+          <CalmModeToggle showLabel={true} />
         </div>
       </aside>
     </>
