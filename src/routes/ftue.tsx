@@ -11,11 +11,12 @@ import {
   SetupChecklist,
   Logo,
   MicrophoneIndicator,
-  VoiceScriptDisplay,
   getChecklistFromSetup,
-  getVoiceScript,
   useFTUEVoice,
+  useFTUEVoiceInput,
+  stepExpectsVoiceInput,
   type FTUEState,
+  type FTUEVoiceResponse,
 } from '../ftue'
 
 export const Route = createFileRoute('/ftue')({
@@ -28,17 +29,80 @@ function FTUEPage() {
   const navigate = useNavigate()
   const [state, dispatch] = useReducer(ftueReducer, undefined, createInitialState)
   const detector = useMemo(() => getDetector(), [])
+  const [showTellMeMore, setShowTellMeMore] = useState(false)
 
-  // Voice integration
+  // Handle voice responses - map to dispatcher actions
+  const handleVoiceResponse = useCallback((response: FTUEVoiceResponse, rawText: string) => {
+    switch (response) {
+      case 'proceed':
+        dispatch({ type: 'PROCEED' })
+        break
+      case 'tell_me_more':
+        setShowTellMeMore(true)
+        break
+      case 'skip':
+        dispatch({ type: 'SKIP' })
+        break
+      case 'add_rig':
+        dispatch({ type: 'START_ADD_RIG' })
+        break
+      case 'start_mayor':
+        dispatch({ type: 'START_MAYOR' })
+        break
+      case 'dashboard':
+        navigate({ to: '/' })
+        break
+      case 'somewhere_else':
+        // For custom workspace path - could show a text input or prompt
+        // For now, just stay on the same screen
+        break
+      case 'timeout':
+        // Silence timeout - could speak a prompt
+        // "No rush. Say 'ready' when you want to begin."
+        break
+      case 'unrecognized':
+        // Unrecognized speech - could prompt again
+        // "I didn't catch that..."
+        break
+    }
+  }, [navigate])
+
+  // Voice integration - playback
   const {
     isSpeaking,
     isReady: voiceReady,
     speakDetection,
+    speakTellMeMore,
   } = useFTUEVoice({
     step: state.step,
     voiceEnabled: state.voiceEnabled,
     platform: state.setupState.platform,
+    onSpeakComplete: () => {
+      // Start listening for voice input after speaking (if step expects it)
+      if (state.voiceEnabled && stepExpectsVoiceInput(state.step)) {
+        voiceInput.startListening()
+      }
+    },
   })
+
+  // Voice input - recognition
+  const voiceInput = useFTUEVoiceInput({
+    step: state.step,
+    enabled: state.voiceEnabled && voiceReady && !isSpeaking,
+    silenceTimeout: 10000, // 10 seconds as per FTUE.md spec
+    onResponse: handleVoiceResponse,
+  })
+
+  // Handle "tell me more" - speak the explanation and then start listening again
+  useEffect(() => {
+    if (showTellMeMore && state.voiceEnabled && voiceReady) {
+      speakTellMeMore().then(() => {
+        setShowTellMeMore(false)
+        // Start listening for response after "tell me more"
+        voiceInput.startListening()
+      })
+    }
+  }, [showTellMeMore, state.voiceEnabled, voiceReady, speakTellMeMore, voiceInput])
 
   // Initial detection on mount
   useEffect(() => {
@@ -134,29 +198,10 @@ function FTUEPage() {
     navigate({ to: '/' })
   }, [navigate])
 
-  const handleResume = useCallback(() => {
-    dispatch({ type: 'RESUME' })
-  }, [])
-
-  const handleStartFresh = useCallback(() => {
-    dispatch({ type: 'START_FRESH' })
-  }, [])
-
   // Render based on current step
   switch (state.step) {
     case 'checking_prerequisites':
       return <LoadingScreen message="Checking your system..." />
-
-    case 'resuming':
-      return (
-        <ResumeScene
-          state={state}
-          onResume={handleResume}
-          onStartFresh={handleStartFresh}
-          onSkip={handleSkip}
-          onToggleVoice={handleToggleVoice}
-        />
-      )
 
     case 'welcome':
       return (
@@ -165,23 +210,12 @@ function FTUEPage() {
           onProceed={handleProceed}
           onSkip={handleSkip}
           onToggleVoice={handleToggleVoice}
-        />
-      )
-
-    case 'quick_setup':
-      return (
-        <QuickSetupScene
-          state={state}
-          onProceed={handleProceed}
-          onSkip={handleSkip}
-          onToggleVoice={handleToggleVoice}
-          isSpeaking={isSpeaking}
+          isListening={voiceInput.isListening}
         />
       )
 
     case 'install_go':
-    case 'waiting_for_go': {
-      const goScript = getVoiceScript('install_go', state.setupState.platform)
+    case 'waiting_for_go':
       return (
         <InstallStep
           state={state}
@@ -190,7 +224,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          scriptText={goScript?.text}
+          isListening={voiceInput.isListening}
         >
           <InstallInstructions
             platform={state.setupState.platform}
@@ -201,11 +235,9 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
-    }
 
     case 'install_beads':
-    case 'waiting_for_beads': {
-      const beadsScript = getVoiceScript('install_beads')
+    case 'waiting_for_beads':
       return (
         <InstallStep
           state={state}
@@ -214,7 +246,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          scriptText={beadsScript?.text}
+          isListening={voiceInput.isListening}
         >
           <CommandBlock
             command="go install github.com/steveyegge/beads/cmd/bd@latest"
@@ -227,11 +259,9 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
-    }
 
     case 'install_gastown':
-    case 'waiting_for_gastown': {
-      const gtScript = getVoiceScript('install_gastown')
+    case 'waiting_for_gastown':
       return (
         <InstallStep
           state={state}
@@ -240,7 +270,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          scriptText={gtScript?.text}
+          isListening={voiceInput.isListening}
         >
           <CommandBlock
             command="go install github.com/steveyegge/gastown/cmd/gt@latest"
@@ -253,10 +283,8 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
-    }
 
-    case 'configure_workspace': {
-      const workspaceScript = getVoiceScript('configure_workspace')
+    case 'configure_workspace':
       return (
         <WorkspaceConfigStep
           state={state}
@@ -264,10 +292,9 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          scriptText={workspaceScript?.text}
+          isListening={voiceInput.isListening}
         />
       )
-    }
 
     case 'creating_workspace':
       return <LoadingScreen message="Creating your workspace..." />
@@ -290,6 +317,7 @@ function FTUEPage() {
           onAddRig={handleAddRig}
           onSkip={handleGoToDashboard}
           onToggleVoice={handleToggleVoice}
+          isListening={voiceInput.isListening}
         />
       )
 
@@ -327,7 +355,7 @@ function InstallStep({
   onToggleVoice,
   onSkip,
   isSpeaking = false,
-  scriptText,
+  isListening = false,
 }: {
   state: FTUEState
   title: string
@@ -336,28 +364,19 @@ function InstallStep({
   onToggleVoice: () => void
   onSkip: () => void
   isSpeaking?: boolean
-  scriptText?: string
+  isListening?: boolean
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-6">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
         <Logo size="md" />
 
         <div className="text-center max-w-lg">
           <h2 className="text-2xl font-bold text-slate-100 mb-2">{title}</h2>
           <p className="text-slate-400">{description}</p>
         </div>
-
-        {/* Show voice script as text when voice is disabled */}
-        {scriptText && (
-          <VoiceScriptDisplay
-            text={scriptText}
-            voiceEnabled={state.voiceEnabled}
-            title="What to do"
-          />
-        )}
 
         <div className="w-full max-w-lg">
           {children}
@@ -368,6 +387,7 @@ function InstallStep({
         <MicrophoneIndicator
           enabled={state.voiceEnabled}
           isSpeaking={isSpeaking}
+          isListening={isListening}
           onToggle={onToggleVoice}
         />
       </main>
@@ -391,14 +411,14 @@ function WorkspaceConfigStep({
   onToggleVoice,
   onSkip,
   isSpeaking = false,
-  scriptText,
+  isListening = false,
 }: {
   state: FTUEState
   onConfigure: (path: string) => void
   onToggleVoice: () => void
   onSkip: () => void
   isSpeaking?: boolean
-  scriptText?: string
+  isListening?: boolean
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
   const defaultPath = '~/gt'
@@ -414,15 +434,6 @@ function WorkspaceConfigStep({
             Your Gas Town workspace is where all your projects and agents will live.
           </p>
         </div>
-
-        {/* Show voice script as text when voice is disabled */}
-        {scriptText && (
-          <VoiceScriptDisplay
-            text={scriptText}
-            voiceEnabled={state.voiceEnabled}
-            title="What to do"
-          />
-        )}
 
         <div className="w-full max-w-md bg-slate-800 rounded-xl p-6 border border-slate-700">
           <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -452,6 +463,7 @@ function WorkspaceConfigStep({
         <MicrophoneIndicator
           enabled={state.voiceEnabled}
           isSpeaking={isSpeaking}
+          isListening={isListening}
           onToggle={onToggleVoice}
         />
       </main>
@@ -474,11 +486,13 @@ function AddRigStep({
   onAddRig,
   onSkip,
   onToggleVoice,
+  isListening = false,
 }: {
   state: FTUEState
   onAddRig: (url: string) => void
   onSkip: () => void
   onToggleVoice: () => void
+  isListening?: boolean
 }) {
   const [gitUrl, setGitUrl] = useState('')
   const [isAdding, setIsAdding] = useState(false)
@@ -532,7 +546,11 @@ function AddRigStep({
           </button>
         </div>
 
-        <MicrophoneIndicator enabled={state.voiceEnabled} onToggle={onToggleVoice} />
+        <MicrophoneIndicator
+          enabled={state.voiceEnabled}
+          isListening={isListening}
+          onToggle={onToggleVoice}
+        />
       </main>
 
       <footer className="px-6 py-4 flex justify-center">
@@ -622,70 +640,6 @@ function CompletionScreen({
   )
 }
 
-/** Quick setup scene - for users with tools installed but no workspace */
-function QuickSetupScene({
-  state,
-  onProceed,
-  onSkip,
-  onToggleVoice,
-  isSpeaking = false,
-}: {
-  state: FTUEState
-  onProceed: () => void
-  onSkip: () => void
-  onToggleVoice: () => void
-  isSpeaking?: boolean
-}) {
-  const checklist = getChecklistFromSetup(state.setupState)
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
-        <Logo size="lg" />
-
-        <div className="text-center max-w-lg">
-          <h2 className="text-2xl font-bold text-slate-100 mb-3">Almost there!</h2>
-          <p className="text-lg text-slate-400">
-            Looks like you have the tools but no workspace yet.
-          </p>
-          <p className="text-slate-500 mt-2">
-            Let's get that set up—it'll just take a moment.
-          </p>
-        </div>
-
-        <SetupChecklist items={checklist} />
-
-        <MicrophoneIndicator
-          enabled={state.voiceEnabled}
-          isSpeaking={isSpeaking}
-          onToggle={onToggleVoice}
-        />
-
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-          <button
-            onClick={onProceed}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-          >
-            Create workspace
-          </button>
-          <button
-            onClick={onSkip}
-            className="px-6 py-3 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 font-medium rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-          >
-            Skip for now
-          </button>
-        </div>
-      </main>
-
-      <footer className="px-6 py-4 text-center text-xs text-slate-600">
-        <p>
-          Your tools are ready: bd {state.setupState.bdVersion}, gt {state.setupState.gtVersion}
-        </p>
-      </footer>
-    </div>
-  )
-}
-
 /** Skipped setup screen */
 function SkippedScreen({ onDashboard }: { onDashboard: () => void }) {
   return (
@@ -704,102 +658,6 @@ function SkippedScreen({ onDashboard }: { onDashboard: () => void }) {
       >
         Continue to Dashboard
       </button>
-    </div>
-  )
-}
-
-/** Resume scene - offered when there's interrupted progress */
-function ResumeScene({
-  state,
-  onResume,
-  onStartFresh,
-  onSkip,
-  onToggleVoice,
-}: {
-  state: FTUEState
-  onResume: () => void
-  onStartFresh: () => void
-  onSkip: () => void
-  onToggleVoice: () => void
-}) {
-  const checklist = getChecklistFromSetup(state.setupState)
-
-  // Get a friendly description of where we left off
-  const getProgressDescription = () => {
-    if (!state.previousProgress) return 'setup'
-
-    const stepDescriptions: Partial<Record<string, string>> = {
-      install_go: 'installing Go',
-      waiting_for_go: 'installing Go',
-      install_beads: 'installing Beads',
-      waiting_for_beads: 'installing Beads',
-      install_gastown: 'installing Gas Town',
-      waiting_for_gastown: 'installing Gas Town',
-      configure_workspace: 'creating your workspace',
-      creating_workspace: 'creating your workspace',
-    }
-
-    return stepDescriptions[state.previousProgress.lastStep] || 'setup'
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
-      {/* Main content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
-        {/* Logo and tagline */}
-        <div className="text-center">
-          <Logo size="lg" />
-          <p className="mt-4 text-xl text-slate-400">
-            Welcome back!
-          </p>
-        </div>
-
-        {/* Resume message */}
-        <div className="max-w-md text-center">
-          <p className="text-slate-300">
-            Looks like we didn't finish setting up last time.
-            You were {getProgressDescription()}.
-          </p>
-          <p className="mt-2 text-slate-400 text-sm">
-            We can pick up right where you left off.
-          </p>
-        </div>
-
-        {/* Show previous progress */}
-        <SetupChecklist items={checklist} />
-
-        {/* Voice indicator */}
-        <MicrophoneIndicator
-          enabled={state.voiceEnabled}
-          onToggle={onToggleVoice}
-        />
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-          <button
-            onClick={onResume}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-          >
-            Continue where I left off
-          </button>
-          <button
-            onClick={onStartFresh}
-            className="px-6 py-3 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 font-medium rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-          >
-            Start fresh
-          </button>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="px-6 py-4 flex justify-center">
-        <button
-          onClick={onSkip}
-          className="text-sm text-slate-500 hover:text-slate-400 transition-colors"
-        >
-          Skip setup for now
-        </button>
-      </footer>
     </div>
   )
 }

@@ -13,6 +13,7 @@ interface WelcomeSceneProps {
   onProceed: () => void
   onSkip: () => void
   onToggleVoice: () => void
+  isListening?: boolean
 }
 
 /** Welcome Scene - First screen of FTUE */
@@ -21,6 +22,7 @@ export function WelcomeScene({
   onProceed,
   onSkip,
   onToggleVoice,
+  isListening = false,
 }: WelcomeSceneProps) {
   const checklist = getChecklistFromSetup(state.setupState)
   const hasPlayedRef = useRef(false)
@@ -110,6 +112,7 @@ export function WelcomeScene({
         <MicrophoneIndicator
           enabled={state.voiceEnabled}
           isSpeaking={isPlaying || isSpeakingTellMeMore}
+          isListening={isListening}
           onToggle={onToggleVoice}
         />
 
