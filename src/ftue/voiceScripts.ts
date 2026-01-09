@@ -38,6 +38,14 @@ Say "let's go" when you're ready, or "tell me more" if you want to know what we'
     expectedResponses: ["let's go", 'ready', 'start', 'tell me more', 'skip'],
   },
 
+  resuming: {
+    text: `Welcome back! Looks like we didn't finish setting up last time. No worries—we can pick up right where you left off.
+
+Would you like to continue from where we were, or start fresh?`,
+    waitForResponse: true,
+    expectedResponses: ['continue', 'resume', 'pick up', 'start fresh', 'start over', 'fresh'],
+  },
+
   checking_prerequisites: {
     text: `Let me check what you already have installed...`,
     delay: 500,

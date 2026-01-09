@@ -3,6 +3,7 @@
 /** Steps in the FTUE flow */
 export type FTUEStep =
   | 'welcome'
+  | 'resuming'  // Offering to resume interrupted setup
   | 'checking_prerequisites'
   | 'install_go'
   | 'waiting_for_go'
@@ -65,6 +66,8 @@ export interface FTUEState {
   lastError?: string
   voiceEnabled: boolean
   startedAt: Date
+  /** Previous progress from interrupted session (for resume offer) */
+  previousProgress?: FTUEProgress
 }
 
 /** Persisted progress for resume */
@@ -80,6 +83,8 @@ export interface FTUEProgress {
 export type FTUEAction =
   | { type: 'INITIAL_CHECK'; setupState: SetupState }
   | { type: 'PROCEED' }
+  | { type: 'RESUME' }  // Resume from interrupted setup
+  | { type: 'START_FRESH' }  // Start over from beginning
   | { type: 'GO_DETECTED'; version: string }
   | { type: 'BD_DETECTED'; version: string }
   | { type: 'GT_DETECTED'; version: string }
@@ -141,14 +146,53 @@ export function createEmptySetupState(): SetupState {
   }
 }
 
+/** Load persisted FTUE progress from localStorage */
+export function loadPersistedProgress(): FTUEProgress | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const stored = localStorage.getItem(FTUE_STORAGE_KEY)
+    if (!stored) return null
+    return JSON.parse(stored) as FTUEProgress
+  } catch {
+    return null
+  }
+}
+
+/** Check if there's an interrupted FTUE session to resume */
+export function hasInterruptedProgress(): boolean {
+  const progress = loadPersistedProgress()
+  if (!progress) return false
+
+  // If FTUE was completed or skipped, no resume needed
+  if (progress.lastStep === 'complete' || progress.lastStep === 'skipped') {
+    return false
+  }
+
+  // If we have progress beyond welcome, offer to resume
+  const interruptibleSteps: FTUEStep[] = [
+    'install_go', 'waiting_for_go',
+    'install_beads', 'waiting_for_beads',
+    'install_gastown', 'waiting_for_gastown',
+    'configure_workspace', 'creating_workspace',
+  ]
+
+  return interruptibleSteps.includes(progress.lastStep)
+}
+
 /** Create initial FTUE state */
 export function createInitialState(): FTUEState {
+  // Check for interrupted progress
+  const previousProgress = loadPersistedProgress()
+  const isInterrupted = hasInterruptedProgress()
+
   return {
-    step: 'checking_prerequisites',
+    step: isInterrupted ? 'resuming' : 'checking_prerequisites',
     setupState: createEmptySetupState(),
     errorCount: 0,
     voiceEnabled: true,
     startedAt: new Date(),
+    previousProgress: isInterrupted ? previousProgress ?? undefined : undefined,
   }
 }
 

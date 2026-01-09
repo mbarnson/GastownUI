@@ -134,10 +134,29 @@ function FTUEPage() {
     navigate({ to: '/' })
   }, [navigate])
 
+  const handleResume = useCallback(() => {
+    dispatch({ type: 'RESUME' })
+  }, [])
+
+  const handleStartFresh = useCallback(() => {
+    dispatch({ type: 'START_FRESH' })
+  }, [])
+
   // Render based on current step
   switch (state.step) {
     case 'checking_prerequisites':
       return <LoadingScreen message="Checking your system..." />
+
+    case 'resuming':
+      return (
+        <ResumeScene
+          state={state}
+          onResume={handleResume}
+          onStartFresh={handleStartFresh}
+          onSkip={handleSkip}
+          onToggleVoice={handleToggleVoice}
+        />
+      )
 
     case 'welcome':
       return (
@@ -610,6 +629,102 @@ function SkippedScreen({ onDashboard }: { onDashboard: () => void }) {
       >
         Continue to Dashboard
       </button>
+    </div>
+  )
+}
+
+/** Resume scene - offered when there's interrupted progress */
+function ResumeScene({
+  state,
+  onResume,
+  onStartFresh,
+  onSkip,
+  onToggleVoice,
+}: {
+  state: FTUEState
+  onResume: () => void
+  onStartFresh: () => void
+  onSkip: () => void
+  onToggleVoice: () => void
+}) {
+  const checklist = getChecklistFromSetup(state.setupState)
+
+  // Get a friendly description of where we left off
+  const getProgressDescription = () => {
+    if (!state.previousProgress) return 'setup'
+
+    const stepDescriptions: Partial<Record<string, string>> = {
+      install_go: 'installing Go',
+      waiting_for_go: 'installing Go',
+      install_beads: 'installing Beads',
+      waiting_for_beads: 'installing Beads',
+      install_gastown: 'installing Gas Town',
+      waiting_for_gastown: 'installing Gas Town',
+      configure_workspace: 'creating your workspace',
+      creating_workspace: 'creating your workspace',
+    }
+
+    return stepDescriptions[state.previousProgress.lastStep] || 'setup'
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
+      {/* Main content */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
+        {/* Logo and tagline */}
+        <div className="text-center">
+          <Logo size="lg" />
+          <p className="mt-4 text-xl text-slate-400">
+            Welcome back!
+          </p>
+        </div>
+
+        {/* Resume message */}
+        <div className="max-w-md text-center">
+          <p className="text-slate-300">
+            Looks like we didn't finish setting up last time.
+            You were {getProgressDescription()}.
+          </p>
+          <p className="mt-2 text-slate-400 text-sm">
+            We can pick up right where you left off.
+          </p>
+        </div>
+
+        {/* Show previous progress */}
+        <SetupChecklist items={checklist} />
+
+        {/* Voice indicator */}
+        <MicrophoneIndicator
+          enabled={state.voiceEnabled}
+          onToggle={onToggleVoice}
+        />
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <button
+            onClick={onResume}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            Continue where I left off
+          </button>
+          <button
+            onClick={onStartFresh}
+            className="px-6 py-3 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 font-medium rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            Start fresh
+          </button>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="px-6 py-4 flex justify-center">
+        <button
+          onClick={onSkip}
+          className="text-sm text-slate-500 hover:text-slate-400 transition-colors"
+        >
+          Skip setup for now
+        </button>
+      </footer>
     </div>
   )
 }
