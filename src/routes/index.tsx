@@ -38,7 +38,7 @@ function Dashboard() {
       !isSetupComplete(setupStatus) &&
       !setupPrefs.setupSkipped
     ) {
-      navigate({ to: '/setup' })
+      navigate({ to: '/ftue' })
     }
   }, [setupStatus, setupLoading, setupPrefs.setupSkipped, prefsLoaded, navigate])
 

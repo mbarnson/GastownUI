@@ -11,12 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VisionosRouteImport } from './routes/visionos'
 import { Route as TmuxRouteImport } from './routes/tmux'
-import { Route as SetupRouteImport } from './routes/setup'
 import { Route as MoleculesRouteImport } from './routes/molecules'
 import { Route as MobileRouteImport } from './routes/mobile'
 import { Route as FtueRouteImport } from './routes/ftue'
 import { Route as DesignRouteImport } from './routes/design'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WelcomeCompleteRouteImport } from './routes/welcome/complete'
 import { Route as RigRigIdRouteImport } from './routes/rig/$rigId'
@@ -36,11 +36,6 @@ const VisionosRoute = VisionosRouteImport.update({
 const TmuxRoute = TmuxRouteImport.update({
   id: '/tmux',
   path: '/tmux',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SetupRoute = SetupRouteImport.update({
-  id: '/setup',
-  path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MoleculesRoute = MoleculesRouteImport.update({
@@ -66,6 +61,11 @@ const DesignRoute = DesignRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -121,12 +121,12 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
   '/ftue': typeof FtueRoute
   '/mobile': typeof MobileRoute
   '/molecules': typeof MoleculesRoute
-  '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
@@ -141,12 +141,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
   '/ftue': typeof FtueRoute
   '/mobile': typeof MobileRoute
   '/molecules': typeof MoleculesRoute
-  '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
@@ -162,12 +162,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/design': typeof DesignRoute
   '/ftue': typeof FtueRoute
   '/mobile': typeof MobileRoute
   '/molecules': typeof MoleculesRoute
-  '/setup': typeof SetupRoute
   '/tmux': typeof TmuxRoute
   '/visionos': typeof VisionosRoute
   '/rig/$rigId': typeof RigRigIdRoute
@@ -184,12 +184,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/compare'
     | '/dashboard'
     | '/design'
     | '/ftue'
     | '/mobile'
     | '/molecules'
-    | '/setup'
     | '/tmux'
     | '/visionos'
     | '/rig/$rigId'
@@ -204,12 +204,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/compare'
     | '/dashboard'
     | '/design'
     | '/ftue'
     | '/mobile'
     | '/molecules'
-    | '/setup'
     | '/tmux'
     | '/visionos'
     | '/rig/$rigId'
@@ -224,12 +224,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/compare'
     | '/dashboard'
     | '/design'
     | '/ftue'
     | '/mobile'
     | '/molecules'
-    | '/setup'
     | '/tmux'
     | '/visionos'
     | '/rig/$rigId'
@@ -245,12 +245,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CompareRoute: typeof CompareRoute
   DashboardRoute: typeof DashboardRoute
   DesignRoute: typeof DesignRoute
   FtueRoute: typeof FtueRoute
   MobileRoute: typeof MobileRoute
   MoleculesRoute: typeof MoleculesRoute
-  SetupRoute: typeof SetupRoute
   TmuxRoute: typeof TmuxRoute
   VisionosRoute: typeof VisionosRoute
   RigRigIdRoute: typeof RigRigIdRoute
@@ -278,13 +278,6 @@ declare module '@tanstack/react-router' {
       path: '/tmux'
       fullPath: '/tmux'
       preLoaderRoute: typeof TmuxRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/setup': {
-      id: '/setup'
-      path: '/setup'
-      fullPath: '/setup'
-      preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/molecules': {
@@ -320,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -397,12 +397,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CompareRoute: CompareRoute,
   DashboardRoute: DashboardRoute,
   DesignRoute: DesignRoute,
   FtueRoute: FtueRoute,
   MobileRoute: MobileRoute,
   MoleculesRoute: MoleculesRoute,
-  SetupRoute: SetupRoute,
   TmuxRoute: TmuxRoute,
   VisionosRoute: VisionosRoute,
   RigRigIdRoute: RigRigIdRoute,

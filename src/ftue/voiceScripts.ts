@@ -38,6 +38,12 @@ Say "let's go" when you're ready, or "tell me more" if you want to know what we'
     expectedResponses: ["let's go", 'ready', 'start', 'tell me more', 'skip'],
   },
 
+  quick_setup: {
+    text: `Looks like you have the tools but no workspace yet. Let's get that set up—it'll just take a moment.`,
+    waitForResponse: false,
+    delay: 500,
+  },
+
   checking_prerequisites: {
     text: `Let me check what you already have installed...`,
     delay: 500,

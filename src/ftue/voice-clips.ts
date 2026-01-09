@@ -26,6 +26,7 @@ export type VoiceClipId =
   | 'beads_path_error'
   | 'install_gastown'
   | 'gastown_found'
+  | 'quick_setup'           // Tools installed but no workspace
   | 'configure_workspace'
   | 'creating_workspace'
   | 'celebration'
@@ -154,6 +155,14 @@ export const FTUE_VOICE_CLIPS: Record<VoiceClipId, VoiceClipMeta> = {
     filename: '10_gastown_found.wav',
     script: `Gas Town is ready. We're almost there.`,
     estimatedDuration: 3,
+  },
+
+  quick_setup: {
+    id: 'quick_setup',
+    src: `${VOICE_ASSETS_PATH}/10b_quick_setup.wav`,
+    filename: '10b_quick_setup.wav',
+    script: `Looks like you have the tools but no workspace yet. Let's get that set up—it'll just take a moment.`,
+    estimatedDuration: 6,
   },
 
   configure_workspace: {

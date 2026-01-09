@@ -26,7 +26,7 @@ export function SetupBanner({ className = '' }: SetupBannerProps) {
 
   const handleCompleteSetup = () => {
     resetSkip(); // Clear the skip flag
-    navigate({ to: '/setup' });
+    navigate({ to: '/ftue' });
   };
 
   const handleDismiss = () => {

@@ -149,6 +149,17 @@ function FTUEPage() {
         />
       )
 
+    case 'quick_setup':
+      return (
+        <QuickSetupScene
+          state={state}
+          onProceed={handleProceed}
+          onSkip={handleSkip}
+          onToggleVoice={handleToggleVoice}
+          isSpeaking={isSpeaking}
+        />
+      )
+
     case 'install_go':
     case 'waiting_for_go': {
       const goScript = getVoiceScript('install_go', state.setupState.platform)
@@ -588,6 +599,70 @@ function CompletionScreen({
       <p className="mt-8 text-sm text-slate-500">
         Pro tip: You can always access Gas Town from your terminal with <code className="text-slate-400">gt</code> commands.
       </p>
+    </div>
+  )
+}
+
+/** Quick setup scene - for users with tools installed but no workspace */
+function QuickSetupScene({
+  state,
+  onProceed,
+  onSkip,
+  onToggleVoice,
+  isSpeaking = false,
+}: {
+  state: FTUEState
+  onProceed: () => void
+  onSkip: () => void
+  onToggleVoice: () => void
+  isSpeaking?: boolean
+}) {
+  const checklist = getChecklistFromSetup(state.setupState)
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
+        <Logo size="lg" />
+
+        <div className="text-center max-w-lg">
+          <h2 className="text-2xl font-bold text-slate-100 mb-3">Almost there!</h2>
+          <p className="text-lg text-slate-400">
+            Looks like you have the tools but no workspace yet.
+          </p>
+          <p className="text-slate-500 mt-2">
+            Let's get that set up—it'll just take a moment.
+          </p>
+        </div>
+
+        <SetupChecklist items={checklist} />
+
+        <MicrophoneIndicator
+          enabled={state.voiceEnabled}
+          isSpeaking={isSpeaking}
+          onToggle={onToggleVoice}
+        />
+
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <button
+            onClick={onProceed}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            Create workspace
+          </button>
+          <button
+            onClick={onSkip}
+            className="px-6 py-3 bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 font-medium rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            Skip for now
+          </button>
+        </div>
+      </main>
+
+      <footer className="px-6 py-4 text-center text-xs text-slate-600">
+        <p>
+          Your tools are ready: bd {state.setupState.bdVersion}, gt {state.setupState.gtVersion}
+        </p>
+      </footer>
     </div>
   )
 }

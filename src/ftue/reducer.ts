@@ -27,10 +27,16 @@ function ftueReducerCore(state: FTUEState, action: FTUEAction): FTUEState {
   switch (action.type) {
     case 'INITIAL_CHECK': {
       // Determine starting step based on detected setup state
+      // For quick_setup: tools installed but no workspace
+      // For complete: everything already set up
+      // Otherwise: start from welcome for full FTUE flow
       const startStep = determineStartStep(action.setupState)
+      const step = startStep === 'complete' || startStep === 'quick_setup'
+        ? startStep
+        : 'welcome'
       return {
         ...state,
-        step: startStep === 'complete' ? 'complete' : 'welcome',
+        step,
         setupState: action.setupState,
       }
     }
@@ -225,6 +231,11 @@ function getNextStep(currentStep: FTUEStep, setupState: {
   hasGtMinVersion: boolean
   hasWorkspace: boolean
 }): FTUEStep {
+  // Quick setup goes directly to workspace configuration
+  if (currentStep === 'quick_setup') {
+    return 'configure_workspace'
+  }
+
   const stepOrder: FTUEStep[] = [
     'welcome',
     'checking_prerequisites',
