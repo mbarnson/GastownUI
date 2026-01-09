@@ -18,6 +18,10 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  server: {
+    port: 3000,
+    strictPort: false, // Falls back to next available port if 3000 is in use
+  },
 })
 
 export default config
