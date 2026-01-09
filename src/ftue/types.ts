@@ -2,6 +2,9 @@
 
 /** Steps in the FTUE flow */
 export type FTUEStep =
+  | 'consent'                     // Voice model consent screen (first step)
+  | 'checking_disk_space'         // Checking if there's enough space for voice
+  | 'insufficient_space'          // Not enough disk space for voice model
   | 'welcome'
   | 'checking_prerequisites'
   | 'install_go'
@@ -55,6 +58,40 @@ export interface SetupState {
   lastError?: string
 }
 
+/** Voice model download state */
+export interface VoiceModelState {
+  /** Whether voice mode was chosen in consent */
+  voiceModeChosen: boolean
+  /** Download in progress */
+  downloading: boolean
+  /** Download complete and model ready */
+  ready: boolean
+  /** Download progress (0-100) */
+  progress: number
+  /** Bytes downloaded */
+  bytesDownloaded: number
+  /** Total bytes to download */
+  totalBytes: number
+  /** Download speed in bytes per second */
+  bytesPerSecond: number
+  /** Estimated seconds remaining */
+  estimatedSecondsRemaining: number
+  /** Download error if any */
+  error?: string
+  /** Number of retry attempts */
+  retryCount: number
+}
+
+/** Disk space info from backend */
+export interface DiskSpaceInfo {
+  availableBytes: number
+  totalBytes: number
+  sufficientForVoice: boolean
+  availableHuman: string
+  requiredBytes: number
+  requiredHuman: string
+}
+
 /** FTUE state machine state */
 export interface FTUEState {
   step: FTUEStep
@@ -65,6 +102,10 @@ export interface FTUEState {
   lastError?: string
   voiceEnabled: boolean
   startedAt: Date
+  /** Voice model download state */
+  voiceModelState: VoiceModelState
+  /** Disk space info from last check */
+  diskSpaceInfo?: DiskSpaceInfo
 }
 
 /** Persisted progress for resume */
@@ -96,6 +137,16 @@ export type FTUEAction =
   | { type: 'START_MAYOR' }
   | { type: 'MAYOR_STARTED' }
   | { type: 'GO_DASHBOARD' }
+  // Voice model consent flow actions
+  | { type: 'ENABLE_VOICE' }                                    // User chose voice mode
+  | { type: 'SKIP_VOICE' }                                      // User chose text-only mode
+  | { type: 'DISK_SPACE_CHECKED'; info: DiskSpaceInfo }         // Disk space check complete
+  | { type: 'CHECK_DISK_SPACE_AGAIN' }                          // Retry disk space check
+  | { type: 'VOICE_DOWNLOAD_STARTED' }                          // Voice model download started
+  | { type: 'VOICE_DOWNLOAD_PROGRESS'; bytes: number; total: number; speed: number }  // Download progress
+  | { type: 'VOICE_DOWNLOAD_COMPLETE' }                         // Download finished successfully
+  | { type: 'VOICE_DOWNLOAD_FAILED'; error: string }            // Download failed
+  | { type: 'VOICE_DOWNLOAD_RETRY' }                            // Retry failed download
 
 /** Checklist item for UI */
 export interface ChecklistItem {
@@ -141,14 +192,30 @@ export function createEmptySetupState(): SetupState {
   }
 }
 
+/** Create initial voice model state */
+export function createInitialVoiceModelState(): VoiceModelState {
+  return {
+    voiceModeChosen: false,
+    downloading: false,
+    ready: false,
+    progress: 0,
+    bytesDownloaded: 0,
+    totalBytes: 0,
+    bytesPerSecond: 0,
+    estimatedSecondsRemaining: 0,
+    retryCount: 0,
+  }
+}
+
 /** Create initial FTUE state */
 export function createInitialState(): FTUEState {
   return {
-    step: 'checking_prerequisites',
+    step: 'consent',  // Start with voice consent screen
     setupState: createEmptySetupState(),
     errorCount: 0,
-    voiceEnabled: true,
+    voiceEnabled: false,  // Not enabled until user chooses
     startedAt: new Date(),
+    voiceModelState: createInitialVoiceModelState(),
   }
 }
 

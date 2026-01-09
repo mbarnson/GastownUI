@@ -5,7 +5,9 @@ import {
   type FTUEAction,
   type FTUEStep,
   type FTUEProgress,
+  type VoiceModelState,
   createInitialState,
+  createInitialVoiceModelState,
   determineStartStep,
   FTUE_STORAGE_KEY,
 } from './types'
@@ -213,6 +215,125 @@ function ftueReducerCore(state: FTUEState, action: FTUEAction): FTUEState {
       return state
     }
 
+    // Voice model consent flow actions
+    case 'ENABLE_VOICE': {
+      // User chose voice mode - check disk space
+      return {
+        ...state,
+        step: 'checking_disk_space',
+        voiceModelState: {
+          ...state.voiceModelState,
+          voiceModeChosen: true,
+        },
+      }
+    }
+
+    case 'SKIP_VOICE': {
+      // User chose text-only mode - proceed to setup detection
+      return {
+        ...state,
+        step: 'checking_prerequisites',
+        voiceEnabled: false,
+        voiceModelState: {
+          ...state.voiceModelState,
+          voiceModeChosen: false,
+        },
+      }
+    }
+
+    case 'DISK_SPACE_CHECKED': {
+      if (action.info.sufficientForVoice) {
+        // Enough space - proceed to setup with voice download in background
+        return {
+          ...state,
+          step: 'checking_prerequisites',
+          voiceEnabled: true,
+          diskSpaceInfo: action.info,
+          voiceModelState: {
+            ...state.voiceModelState,
+            downloading: true,
+          },
+        }
+      } else {
+        // Not enough space - show insufficient space screen
+        return {
+          ...state,
+          step: 'insufficient_space',
+          diskSpaceInfo: action.info,
+        }
+      }
+    }
+
+    case 'CHECK_DISK_SPACE_AGAIN': {
+      // User freed up space and wants to try again
+      return {
+        ...state,
+        step: 'checking_disk_space',
+      }
+    }
+
+    case 'VOICE_DOWNLOAD_STARTED': {
+      return {
+        ...state,
+        voiceModelState: {
+          ...state.voiceModelState,
+          downloading: true,
+          error: undefined,
+        },
+      }
+    }
+
+    case 'VOICE_DOWNLOAD_PROGRESS': {
+      const progress = action.total > 0 ? (action.bytes / action.total) * 100 : 0
+      const remaining = action.speed > 0 ? (action.total - action.bytes) / action.speed : 0
+      return {
+        ...state,
+        voiceModelState: {
+          ...state.voiceModelState,
+          progress,
+          bytesDownloaded: action.bytes,
+          totalBytes: action.total,
+          bytesPerSecond: action.speed,
+          estimatedSecondsRemaining: remaining,
+        },
+      }
+    }
+
+    case 'VOICE_DOWNLOAD_COMPLETE': {
+      return {
+        ...state,
+        voiceModelState: {
+          ...state.voiceModelState,
+          downloading: false,
+          ready: true,
+          progress: 100,
+        },
+      }
+    }
+
+    case 'VOICE_DOWNLOAD_FAILED': {
+      return {
+        ...state,
+        voiceModelState: {
+          ...state.voiceModelState,
+          downloading: false,
+          error: action.error,
+        },
+      }
+    }
+
+    case 'VOICE_DOWNLOAD_RETRY': {
+      return {
+        ...state,
+        voiceModelState: {
+          ...state.voiceModelState,
+          downloading: true,
+          error: undefined,
+          retryCount: state.voiceModelState.retryCount + 1,
+        },
+      }
+    }
+
     default:
       return state
   }
@@ -225,6 +346,8 @@ function getNextStep(currentStep: FTUEStep, setupState: {
   hasGtMinVersion: boolean
   hasWorkspace: boolean
 }): FTUEStep {
+  // Note: 'consent' and 'checking_disk_space' are handled by ENABLE_VOICE/SKIP_VOICE actions
+  // The stepOrder starts from 'welcome' which is after the consent flow
   const stepOrder: FTUEStep[] = [
     'welcome',
     'checking_prerequisites',

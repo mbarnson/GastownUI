@@ -61,6 +61,7 @@ pub fn run() {
             setup::install_dependency,
             setup::create_workspace,
             setup::get_setup_status,
+            setup::check_disk_space,
             chunked_download::start_chunked_download,
             chunked_download::pause_download,
             chunked_download::resume_download,

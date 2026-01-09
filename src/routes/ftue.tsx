@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import React, { useReducer, useEffect, useMemo, useCallback, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import {
   ftueReducer,
   createInitialState,
@@ -12,10 +13,14 @@ import {
   Logo,
   MicrophoneIndicator,
   VoiceScriptDisplay,
+  VoiceModelConsentScreen,
+  CheckingDiskSpaceScreen,
+  InsufficientSpaceScreen,
   getChecklistFromSetup,
   getVoiceScript,
   useFTUEVoice,
   type FTUEState,
+  type DiskSpaceInfo,
 } from '../ftue'
 
 export const Route = createFileRoute('/ftue')({
@@ -117,6 +122,50 @@ function FTUEPage() {
     }
   }, [detector])
 
+  // Voice consent handlers
+  const handleEnableVoice = useCallback(() => {
+    dispatch({ type: 'ENABLE_VOICE' })
+  }, [])
+
+  const handleSkipVoice = useCallback(() => {
+    dispatch({ type: 'SKIP_VOICE' })
+  }, [])
+
+  const handleCheckDiskSpaceAgain = useCallback(() => {
+    dispatch({ type: 'CHECK_DISK_SPACE_AGAIN' })
+  }, [])
+
+  // Check disk space when in checking_disk_space step
+  useEffect(() => {
+    if (state.step === 'checking_disk_space') {
+      invoke<{
+        available_bytes: number
+        total_bytes: number
+        sufficient_for_voice: boolean
+        available_human: string
+        required_bytes: number
+        required_human: string
+      }>('check_disk_space')
+        .then(result => {
+          // Convert snake_case from Rust to camelCase for TypeScript
+          const info: DiskSpaceInfo = {
+            availableBytes: result.available_bytes,
+            totalBytes: result.total_bytes,
+            sufficientForVoice: result.sufficient_for_voice,
+            availableHuman: result.available_human,
+            requiredBytes: result.required_bytes,
+            requiredHuman: result.required_human,
+          }
+          dispatch({ type: 'DISK_SPACE_CHECKED', info })
+        })
+        .catch(error => {
+          console.error('Failed to check disk space:', error)
+          // On error, proceed with text mode
+          dispatch({ type: 'SKIP_VOICE' })
+        })
+    }
+  }, [state.step])
+
   // Navigation handlers
   const handleProceed = useCallback(() => {
     dispatch({ type: 'PROCEED' })
@@ -136,6 +185,27 @@ function FTUEPage() {
 
   // Render based on current step
   switch (state.step) {
+    case 'consent':
+      return (
+        <VoiceModelConsentScreen
+          state={state}
+          onEnableVoice={handleEnableVoice}
+          onSkipVoice={handleSkipVoice}
+        />
+      )
+
+    case 'checking_disk_space':
+      return <CheckingDiskSpaceScreen message="Checking available disk space..." />
+
+    case 'insufficient_space':
+      return (
+        <InsufficientSpaceScreen
+          diskSpaceInfo={state.diskSpaceInfo!}
+          onCheckAgain={handleCheckDiskSpaceAgain}
+          onUseTextMode={handleSkipVoice}
+        />
+      )
+
     case 'checking_prerequisites':
       return <LoadingScreen message="Checking your system..." />
 
