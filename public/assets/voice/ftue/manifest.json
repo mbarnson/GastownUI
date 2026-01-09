@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "description": "Pre-baked voice clips for FTUE (First-Time User Experience)",
+  "description": "Pre-baked voice clips for FTUE v2 (First-Time User Experience) - Theatrical Illusion",
   "model": "LFM2.5-Audio-1.5B-GGUF",
   "format": "wav",
   "sampleRate": 24000,
@@ -11,123 +11,144 @@
   },
   "clips": [
     {
-      "id": "welcome",
-      "filename": "01-welcome.wav",
-      "script": "Welcome to Gas Town. I'm your slightly snarky assistant, and I promise I'm here to help. Mostly.",
-      "duration": null,
-      "generated": false
+      "id": "consent_intro",
+      "filename": "00_consent_intro.wav",
+      "script": "Gas Town works best with voice. I can guide you through setup, answer questions, and help manage your convoys hands-free. This requires downloading a voice model—about two to three gigabytes.",
+      "duration": 26.84,
+      "generated": true
     },
     {
-      "id": "dashboard-intro",
-      "filename": "02-dashboard-intro.wav",
-      "script": "This is the Refinery Floor - your command center. Convoys on the left, activity on the right. Try not to break anything.",
-      "duration": null,
-      "generated": false
+      "id": "download_starting",
+      "filename": "01_download_starting.wav",
+      "script": "Thanks! I'm downloading my voice model now—it'll be a few gigabytes. In the meantime, I'll walk you through getting Gas Town set up using some recordings I made earlier. Let's get started!",
+      "duration": 23.64,
+      "generated": true
     },
     {
-      "id": "convoy-explained",
-      "filename": "03-convoy-explained.wav",
-      "script": "Convoys are batches of work moving through the system. Think of them as road trains hauling your tasks. The progress bars tell you how close you are to done.",
-      "duration": null,
-      "generated": false
+      "id": "checking_go",
+      "filename": "02_checking_go.wav",
+      "script": "Let me check what you already have installed.",
+      "duration": 4.76,
+      "generated": true
     },
     {
-      "id": "polecat-intro",
-      "filename": "04-polecat-intro.wav",
-      "script": "Polecats are your worker agents. They're ephemeral - they spawn, do work, and disappear. Like good code reviewers.",
-      "duration": null,
-      "generated": false
+      "id": "go_found",
+      "filename": "03_go_found.wav",
+      "script": "Nice—you've got Go installed. That's all we need to install the tools.",
+      "duration": 10.2,
+      "generated": true
     },
     {
-      "id": "rig-explained",
-      "filename": "05-rig-explained.wav",
-      "script": "A rig is your project container. It has polecats, a merge queue called the refinery, and a witness that makes sure nobody gets stuck.",
-      "duration": null,
-      "generated": false
+      "id": "go_missing_mac",
+      "filename": "04_go_missing_mac.wav",
+      "script": "First thing we need is Go—it's the programming language that Gas Town is written in. On Mac, the easiest way is with Homebrew. If you have Homebrew, run: brew install go. If you don't have Homebrew yet, you can get it at brew.sh, or download Go directly from go.dev. Let me know when Go is installed.",
+      "duration": 43.16,
+      "generated": true
     },
     {
-      "id": "beads-intro",
-      "filename": "06-beads-intro.wav",
-      "script": "Beads are your issues - bugs, features, tasks. We track them so you don't have to remember everything. Unlike your brain, we don't forget.",
-      "duration": null,
-      "generated": false
+      "id": "go_missing_linux",
+      "filename": "04_go_missing_linux.wav",
+      "script": "First thing we need is Go—it's the programming language that Gas Town is written in. On Linux, you can usually install Go with your package manager. For Ubuntu or Debian: sudo apt install golang-go. Or download it directly from go.dev. Let me know when it's ready.",
+      "duration": 33.24,
+      "generated": true
     },
     {
-      "id": "voice-command-hint",
-      "filename": "07-voice-command-hint.wav",
-      "script": "You can talk to me. Just hold the spacebar and ask. Or click the mic button if you're feeling fancy.",
-      "duration": null,
-      "generated": false
+      "id": "go_missing_windows",
+      "filename": "04_go_missing_windows.wav",
+      "script": "First thing we need is Go—it's the programming language that Gas Town is written in. On Windows, head to go.dev/dl and download the installer. Run it, and make sure to check the box that adds Go to your PATH. Let me know when the installation finishes.",
+      "duration": 33.56,
+      "generated": true
     },
     {
-      "id": "tmux-panel",
-      "filename": "08-tmux-panel.wav",
-      "script": "The tmux panel shows your terminal sessions. Yes, there's still a command line underneath. Old habits die hard.",
-      "duration": null,
-      "generated": false
+      "id": "go_path_error",
+      "filename": "05_go_path_error.wav",
+      "script": "Hmm, I'm not finding Go in your PATH. This usually means you need to add Go's bin directory to your shell configuration. Try adding the Go bin path to your shell profile, then restart your terminal and we can check again.",
+      "duration": 28.28,
+      "generated": true
     },
     {
-      "id": "sling-work",
-      "filename": "09-sling-work.wav",
-      "script": "To assign work, say 'sling that to' followed by the rig name. Or use the UI if you're into clicking things.",
-      "duration": null,
-      "generated": false
+      "id": "install_beads",
+      "filename": "06_install_beads.wav",
+      "script": "Now let's install Beads—this is the issue tracker your agents will use to coordinate work. It's like Jira, but stored in Git and actually pleasant to use. Run the go install command shown on screen. This will download and compile Beads. It might take a minute or two the first time.",
+      "duration": 38.04,
+      "generated": true
     },
     {
-      "id": "cost-tracking",
-      "filename": "10-cost-tracking.wav",
-      "script": "We track costs so you don't accidentally burn through your budget. You can set alerts. I'll nag you. It's what I do.",
-      "duration": null,
-      "generated": false
+      "id": "beads_found",
+      "filename": "07_beads_found.wav",
+      "script": "Beads is installed. Nice.",
+      "duration": 5.72,
+      "generated": true
     },
     {
-      "id": "offline-mode",
-      "filename": "11-offline-mode.wav",
-      "script": "Lost connection? No worries. I'll cache what I can and sync when you're back online. I'm helpful like that.",
-      "duration": null,
-      "generated": false
+      "id": "beads_path_error",
+      "filename": "08_beads_path_error.wav",
+      "script": "Beads installed, but your shell can't find it yet. You need to add Go's bin directory to your PATH. Add the Go bin path to your shell profile, then run source on your profile or restart your terminal.",
+      "duration": 26.52,
+      "generated": true
     },
     {
-      "id": "keyboard-shortcuts",
-      "filename": "12-keyboard-shortcuts.wav",
-      "script": "Command-K opens the command palette. It's faster than clicking around. Trust me on this one.",
-      "duration": null,
-      "generated": false
+      "id": "install_gastown",
+      "filename": "09_install_gastown.wav",
+      "script": "One more tool: Gas Town itself. Same process—run the go install command on screen. This is the orchestrator that coordinates all your coding agents. It'll take a minute to compile.",
+      "duration": 24.76,
+      "generated": true
     },
     {
-      "id": "activity-feed",
-      "filename": "13-activity-feed.wav",
-      "script": "The activity feed shows what's happening in real-time. Commits, merges, stuck polecats - all the drama.",
-      "duration": null,
-      "generated": false
+      "id": "gastown_found",
+      "filename": "10_gastown_found.wav",
+      "script": "Gas Town is ready. We're almost there.",
+      "duration": 5.72,
+      "generated": true
     },
     {
-      "id": "merge-queue",
-      "filename": "14-merge-queue.wav",
-      "script": "The refinery is your merge queue. Work goes in, clean code comes out. Usually.",
-      "duration": null,
-      "generated": false
+      "id": "configure_workspace",
+      "filename": "11_configure_workspace.wav",
+      "script": "Last step: we need to create your Gas Town workspace. This is your headquarters—the directory where all your projects and agents will live. The standard location is ~/gt. Does that work for you, or would you prefer somewhere else?",
+      "duration": 42.2,
+      "generated": true
     },
     {
-      "id": "witness-role",
-      "filename": "15-witness-role.wav",
-      "script": "The witness monitors polecats. If one gets stuck, it nudges them. Think of it as a nervous hall monitor.",
-      "duration": null,
-      "generated": false
+      "id": "creating_workspace",
+      "filename": "12_creating_workspace.wav",
+      "script": "Creating your workspace now.",
+      "duration": 3.96,
+      "generated": true
     },
     {
-      "id": "help-available",
-      "filename": "16-help-available.wav",
-      "script": "Need help? Just ask 'what can you do' or 'help me with' something. I'm snarky, not unhelpful.",
-      "duration": null,
-      "generated": false
+      "id": "celebration",
+      "filename": "13_celebration.wav",
+      "script": "You're all set! You've got a fresh Gas Town workspace ready to go.",
+      "duration": 9.56,
+      "generated": true
     },
     {
-      "id": "ftue-complete",
-      "filename": "17-ftue-complete.wav",
-      "script": "That's the basics. You're ready to cause some chaos. Don't worry, I'll be here to judge your code.",
-      "duration": null,
-      "generated": false
+      "id": "next_steps",
+      "filename": "14_next_steps.wav",
+      "script": "A few things you might want to do next. You could add a project—if you have a Git repository you want to work on, I can help you add it as a rig. Or, you can start the Mayor—that's your main coordination agent. What sounds good?",
+      "duration": 28.6,
+      "generated": true
+    },
+    {
+      "id": "download_failed",
+      "filename": "15_download_failed.wav",
+      "script": "The download ran into some trouble. Sometimes the internet just has a bad day. Want to try again?",
+      "duration": 12.28,
+      "generated": true
+    },
+    {
+      "id": "download_complete",
+      "filename": "16_download_complete.wav",
+      "script": "My voice model is all downloaded now. I'm fully online and ready to help you with whatever you need.",
+      "duration": 12.28,
+      "generated": true
+    },
+    {
+      "id": "goodbye",
+      "filename": "17_goodbye.wav",
+      "script": "Happy coding!",
+      "duration": 3,
+      "generated": true
     }
   ]
 }
