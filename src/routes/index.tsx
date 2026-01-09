@@ -5,6 +5,7 @@ import { SelfTestPanel } from '../components/SelfTestPanel'
 import TmuxPanel from '../components/TmuxPanel'
 import { DeepQueryPanel } from '../components/DeepQueryPanel'
 import { SetupBanner } from '../components/SetupBanner'
+import { Skeleton, SkeletonText } from '../components/animations'
 import { useConvoys, useBeads, useStopAll } from '../hooks/useGastown'
 import { useActiveMolecules } from '../hooks/useMolecule'
 import { useSetupStatus, isSetupComplete } from '../hooks/useSetup'
@@ -52,28 +53,45 @@ function Dashboard() {
           {/* Main content area */}
           <div className="lg:col-span-2 space-y-6">
             {/* Convoys */}
-            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6 animate-slide-up">
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <Truck className="w-5 h-5 text-rose-500" />
                 Convoys in Flight
               </h2>
               {convoysLoading ? (
-                <div className="text-gray-400">Loading...</div>
+                <div className="space-y-3">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <Skeleton width="60%" height="1.25rem" />
+                        <Skeleton width="4rem" height="0.75rem" />
+                      </div>
+                      <Skeleton width="100%" height="0.5rem" rounded="full" />
+                      <div className="flex items-center justify-between mt-3">
+                        <Skeleton width="5rem" height="0.75rem" />
+                        <Skeleton width="4rem" height="0.75rem" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : convoys && convoys.length > 0 ? (
                 <div className="space-y-3">
                   {convoys.map((convoy) => (
                     <div
                       key={convoy.id}
-                      className="bg-slate-900/50 rounded-lg p-4 border border-slate-600"
+                      className="bg-slate-900/50 rounded-lg p-4 border border-slate-600 card-hover"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-white font-medium">{convoy.name}</span>
                         <span className="text-xs text-gray-400">{convoy.id}</span>
                       </div>
-                      <div className="w-full bg-slate-700 rounded-full h-2">
+                      <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
                         <div
-                          className="bg-rose-500 h-2 rounded-full transition-all"
-                          style={{ width: `${convoy.progress}%` }}
+                          className="bg-rose-500 h-2 rounded-full"
+                          style={{
+                            width: `${convoy.progress}%`,
+                            transition: 'width var(--duration-slow) var(--ease-out)',
+                          }}
                         />
                       </div>
                       <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
@@ -93,7 +111,7 @@ function Dashboard() {
             </section>
 
             {/* Active Molecules (Workflows) */}
-            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6 animate-slide-up" style={{ animationDelay: '50ms' }}>
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <GitBranch className="w-5 h-5 text-purple-400" />
                 Active Workflows
@@ -101,7 +119,7 @@ function Dashboard() {
               {molecules && molecules.length > 0 ? (
                 <div className="space-y-4">
                   {molecules.map((mol) => (
-                    <div key={mol.id} className="p-4 bg-slate-700/50 rounded-lg">
+                    <div key={mol.id} className="p-4 bg-slate-700/50 rounded-lg card-hover">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-white">{mol.name}</span>
                         <span className="text-sm text-gray-400">{mol.progress}%</span>
@@ -120,7 +138,7 @@ function Dashboard() {
             </section>
 
             {/* Ready Work */}
-            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6">
+            <section className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700 p-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <Circle className="w-5 h-5 text-cyan-400" />
                 Ready Work
@@ -183,10 +201,10 @@ function Dashboard() {
       {/* Emergency Stop */}
       <div className="fixed bottom-6 right-6">
         <button
-          className={`p-4 text-white rounded-full shadow-lg transition-all hover:scale-105 ${
+          className={`p-4 text-white rounded-full shadow-lg btn-interactive ${
             stopAll.isPending
               ? 'bg-red-800 cursor-wait shadow-red-800/30'
-              : 'bg-red-600 hover:bg-red-700 shadow-red-600/30'
+              : 'bg-red-600 hover:bg-red-700 shadow-red-600/30 hover:shadow-red-600/50'
           }`}
           title="Emergency Stop All"
           aria-label="Emergency Stop All Gas Town agents"

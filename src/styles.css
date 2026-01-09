@@ -406,3 +406,460 @@ textarea:focus-visible {
   animation: none;
   opacity: 0;
 }
+
+/* ===========================================
+   UI Animation System (ga-3ipw)
+   Subtle, purposeful animations for micro-interactions,
+   page transitions, and loading states.
+   All animations respect prefers-reduced-motion.
+   =========================================== */
+
+/* Animation timing and easing CSS variables */
+:root {
+  /* Timing - based on Material Design motion principles */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 400ms;
+  --duration-page: 250ms;
+
+  /* Easing curves */
+  --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* ============ FADE ANIMATIONS ============ */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in var(--duration-normal) var(--ease-out) forwards;
+}
+
+.animate-fade-out {
+  animation: fade-out var(--duration-normal) var(--ease-in) forwards;
+}
+
+/* ============ SLIDE ANIMATIONS ============ */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up var(--duration-normal) var(--ease-out) forwards;
+}
+
+.animate-slide-down {
+  animation: slide-down var(--duration-normal) var(--ease-out) forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right var(--duration-slow) var(--ease-out) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left var(--duration-slow) var(--ease-out) forwards;
+}
+
+/* ============ SCALE ANIMATIONS ============ */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  70% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in var(--duration-normal) var(--ease-out) forwards;
+}
+
+.animate-scale-out {
+  animation: scale-out var(--duration-fast) var(--ease-in) forwards;
+}
+
+.animate-pop-in {
+  animation: pop-in var(--duration-slow) var(--ease-spring) forwards;
+}
+
+/* ============ BUTTON MICRO-INTERACTIONS ============ */
+
+/* Enhanced button hover/active states */
+.btn-interactive {
+  transition: transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out);
+}
+
+.btn-interactive:hover {
+  transform: translateY(-1px);
+}
+
+.btn-interactive:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Press effect for buttons */
+.btn-press {
+  transition: transform var(--duration-instant) var(--ease-out);
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Ripple effect base */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity var(--duration-fast), transform var(--duration-slow);
+}
+
+.btn-ripple:active::after {
+  opacity: 1;
+  transform: scale(2);
+  transition: transform 0ms;
+}
+
+/* ============ CARD HOVER EFFECTS ============ */
+
+/* Subtle lift effect for cards */
+.card-hover {
+  transition: transform var(--duration-normal) var(--ease-out),
+              box-shadow var(--duration-normal) var(--ease-out),
+              border-color var(--duration-normal) var(--ease-out);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.3),
+              0 4px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+/* Glow effect for interactive cards */
+.card-glow {
+  transition: box-shadow var(--duration-normal) var(--ease-out),
+              border-color var(--duration-normal) var(--ease-out);
+}
+
+.card-glow:hover {
+  box-shadow: 0 0 20px -5px rgba(244, 63, 94, 0.3);
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
+/* ============ LOADING STATES ============ */
+
+/* Skeleton shimmer effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--app-surface-alt) 25%,
+    var(--app-surface-strong) 50%,
+    var(--app-surface-alt) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* Pulse animation for loading indicators */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s var(--ease-in-out) infinite;
+}
+
+/* Spinner animation */
+@keyframes spin-smooth {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-smooth {
+  animation: spin-smooth 1s linear infinite;
+}
+
+/* Progress bar animation */
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.progress-bar-indeterminate {
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-indeterminate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 25%;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  animation: progress-indeterminate 1.5s var(--ease-in-out) infinite;
+}
+
+/* ============ PAGE TRANSITIONS ============ */
+
+/* Page enter animation */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Page exit animation */
+@keyframes page-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.page-transition-enter {
+  animation: page-enter var(--duration-page) var(--ease-out) forwards;
+}
+
+.page-transition-exit {
+  animation: page-exit var(--duration-page) var(--ease-in) forwards;
+}
+
+/* Staggered children animation helper */
+.stagger-children > * {
+  opacity: 0;
+  animation: slide-up var(--duration-normal) var(--ease-out) forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(n+7) { animation-delay: 300ms; }
+
+/* ============ REDUCED MOTION OVERRIDES ============ */
+/* All animations defined above are disabled when reduced motion is preferred */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-out,
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-slide-in-right,
+  .animate-slide-in-left,
+  .animate-scale-in,
+  .animate-scale-out,
+  .animate-pop-in,
+  .animate-pulse-subtle,
+  .animate-spin-smooth,
+  .page-transition-enter,
+  .page-transition-exit {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .skeleton {
+    animation: none;
+    background: var(--app-surface-alt);
+  }
+
+  .progress-bar-indeterminate::after {
+    animation: none;
+    width: 100%;
+    background: currentColor;
+    opacity: 0.5;
+  }
+
+  .btn-interactive:hover,
+  .btn-interactive:active,
+  .btn-press:active,
+  .card-hover:hover {
+    transform: none !important;
+  }
+
+  .btn-ripple::after {
+    display: none;
+  }
+
+  .stagger-children > * {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Calm mode also disables these animations */
+.calm-mode .animate-fade-in,
+.calm-mode .animate-fade-out,
+.calm-mode .animate-slide-up,
+.calm-mode .animate-slide-down,
+.calm-mode .animate-slide-in-right,
+.calm-mode .animate-slide-in-left,
+.calm-mode .animate-scale-in,
+.calm-mode .animate-scale-out,
+.calm-mode .animate-pop-in,
+.calm-mode .animate-pulse-subtle,
+.calm-mode .animate-spin-smooth,
+.calm-mode .page-transition-enter,
+.calm-mode .page-transition-exit {
+  animation: none !important;
+  opacity: 1;
+  transform: none;
+}
+
+.calm-mode .skeleton {
+  animation: none;
+  background: var(--app-surface-alt);
+}
+
+.calm-mode .progress-bar-indeterminate::after {
+  animation: none;
+  width: 100%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.calm-mode .btn-interactive:hover,
+.calm-mode .btn-interactive:active,
+.calm-mode .btn-press:active,
+.calm-mode .card-hover:hover {
+  transform: none !important;
+}
+
+.calm-mode .btn-ripple::after {
+  display: none;
+}
+
+.calm-mode .stagger-children > * {
+  animation: none;
+  opacity: 1;
+}

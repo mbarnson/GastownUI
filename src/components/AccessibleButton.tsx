@@ -84,7 +84,7 @@ export const AccessibleButton = forwardRef<
         className={`
           inline-flex items-center justify-center
           font-medium rounded-lg border
-          transition-colors duration-150
+          btn-interactive
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
           disabled:opacity-50 disabled:cursor-not-allowed
           ${variantClasses[variant]}
@@ -97,7 +97,7 @@ export const AccessibleButton = forwardRef<
       >
         {loading ? (
           <span
-            className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
+            className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin-smooth"
             aria-hidden="true"
           />
         ) : icon ? (
@@ -147,7 +147,7 @@ export const TouchTarget = forwardRef<HTMLButtonElement, TouchTargetProps>(
           rounded-lg
           text-slate-400 hover:text-white
           hover:bg-slate-800 active:bg-slate-700
-          transition-colors duration-150
+          btn-press
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
           disabled:opacity-50 disabled:cursor-not-allowed
           ${className}
