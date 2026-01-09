@@ -547,3 +547,83 @@ pub async fn create_workspace(path: Option<String>) -> Result<InstallResult, Str
 pub async fn get_setup_status() -> Result<SetupStatus, String> {
     check_dependencies().await
 }
+
+/// Result of running a gt command
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GtCommandResult {
+    pub success: bool,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+}
+
+/// Install Gas Town to a path
+/// Runs: gt install <path> [--git]
+#[tauri::command]
+pub async fn gt_install(path: String, with_git: Option<bool>) -> Result<GtCommandResult, String> {
+    let resolved_path = expand_tilde(&path);
+    let path_str = resolved_path.to_string_lossy().to_string();
+
+    let mut args = vec!["install".to_string(), path_str];
+    if with_git.unwrap_or(false) {
+        args.push("--git".to_string());
+    }
+
+    let output = Command::new("gt")
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to run gt install: {}", e))?;
+
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    Ok(GtCommandResult {
+        success: output.status.success(),
+        stdout,
+        stderr,
+        exit_code,
+    })
+}
+
+/// Add a rig (Git repository) to the workspace
+/// Runs: gt rig add <name> <url>
+#[tauri::command]
+pub async fn gt_rig_add(name: String, url: String) -> Result<GtCommandResult, String> {
+    let output = Command::new("gt")
+        .args(["rig", "add", &name, &url])
+        .output()
+        .map_err(|e| format!("Failed to run gt rig add: {}", e))?;
+
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    Ok(GtCommandResult {
+        success: output.status.success(),
+        stdout,
+        stderr,
+        exit_code,
+    })
+}
+
+/// Start the Mayor agent
+/// Runs: gt mayor start
+#[tauri::command]
+pub async fn gt_mayor_start() -> Result<GtCommandResult, String> {
+    let output = Command::new("gt")
+        .args(["mayor", "start"])
+        .output()
+        .map_err(|e| format!("Failed to run gt mayor start: {}", e))?;
+
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    Ok(GtCommandResult {
+        success: output.status.success(),
+        stdout,
+        stderr,
+        exit_code,
+    })
+}
