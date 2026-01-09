@@ -1,7 +1,27 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+// Check if running in Tauri desktop app
+function isTauri(): boolean {
+  return typeof window !== 'undefined' && '__TAURI__' in window;
+}
+
+// Lazy import Tauri APIs to avoid errors in browser
+async function getTauriInvoke() {
+  if (!isTauri()) {
+    throw new Error('Not running in Tauri environment');
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke;
+}
+
+async function getTauriListen() {
+  if (!isTauri()) {
+    throw new Error('Not running in Tauri environment');
+  }
+  const { listen } = await import('@tauri-apps/api/event');
+  return listen;
+}
 
 // Types matching Rust structs
 export interface VoiceServerStatus {
@@ -34,28 +54,54 @@ export interface VoiceServerConfig {
 // Query key constants
 const VOICE_STATUS_KEY = ['voice', 'status'];
 
+// Disabled status for non-Tauri environments
+const DISABLED_STATUS: VoiceServerStatus = {
+  running: false,
+  ready: false,
+  url: '',
+};
+
 /**
  * Hook for managing voice server lifecycle
  */
 export function useVoiceServer() {
   const queryClient = useQueryClient();
+  const inTauri = isTauri();
 
   const statusQuery = useQuery({
     queryKey: VOICE_STATUS_KEY,
-    queryFn: () => invoke<VoiceServerStatus>('get_voice_server_status'),
-    refetchInterval: 5000,
+    queryFn: async () => {
+      if (!inTauri) {
+        return DISABLED_STATUS;
+      }
+      const invoke = await getTauriInvoke();
+      return invoke<VoiceServerStatus>('get_voice_server_status');
+    },
+    refetchInterval: inTauri ? 5000 : false,
+    enabled: true,
   });
 
   const startMutation = useMutation({
-    mutationFn: (config?: VoiceServerConfig) =>
-      invoke<VoiceServerStatus>('start_voice_server', { config }),
+    mutationFn: async (config?: VoiceServerConfig) => {
+      if (!inTauri) {
+        return DISABLED_STATUS;
+      }
+      const invoke = await getTauriInvoke();
+      return invoke<VoiceServerStatus>('start_voice_server', { config });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: VOICE_STATUS_KEY });
     },
   });
 
   const stopMutation = useMutation({
-    mutationFn: () => invoke('stop_voice_server'),
+    mutationFn: async () => {
+      if (!inTauri) {
+        return;
+      }
+      const invoke = await getTauriInvoke();
+      return invoke('stop_voice_server');
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: VOICE_STATUS_KEY });
     },
@@ -263,15 +309,22 @@ export function useVoiceInteraction() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResponse, setLastResponse] = useState<VoiceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const inTauri = isTauri();
 
   const sendVoice = useCallback(async (
     audioBase64: string,
     options?: VoiceInputOptions
   ) => {
+    if (!inTauri) {
+      setError('Voice features require the desktop app');
+      throw new Error('Voice features require the desktop app');
+    }
+
     setIsProcessing(true);
     setError(null);
 
     try {
+      const invoke = await getTauriInvoke();
       const response = await invoke<VoiceResponse>('send_voice_input', {
         audioBase64,
         mode: options?.mode,
@@ -293,12 +346,17 @@ export function useVoiceInteraction() {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [inTauri]);
 
   const streamVoice = useCallback(async (
     audioBase64: string,
     options?: VoiceStreamOptions
   ) => {
+    if (!inTauri) {
+      setError('Voice features require the desktop app');
+      throw new Error('Voice features require the desktop app');
+    }
+
     setIsProcessing(true);
     setError(null);
 
@@ -308,6 +366,9 @@ export function useVoiceInteraction() {
     let unlisten: (() => void) | null = null;
 
     try {
+      const listen = await getTauriListen();
+      const invoke = await getTauriInvoke();
+
       unlisten = await listen<VoiceStreamEvent>('voice_stream', (event) => {
         const payload = event.payload;
         if (payload.streamId !== streamId) {
@@ -363,13 +424,19 @@ export function useVoiceInteraction() {
       }
       setIsProcessing(false);
     }
-  }, []);
+  }, [inTauri]);
 
   const transcribe = useCallback(async (audioBase64: string) => {
+    if (!inTauri) {
+      setError('Voice features require the desktop app');
+      throw new Error('Voice features require the desktop app');
+    }
+
     setIsProcessing(true);
     setError(null);
 
     try {
+      const invoke = await getTauriInvoke();
       const text = await invoke<string>('transcribe_audio', { audioBase64 });
       return text;
     } catch (err) {
@@ -379,13 +446,19 @@ export function useVoiceInteraction() {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [inTauri]);
 
   const speak = useCallback(async (text: string) => {
+    if (!inTauri) {
+      setError('Voice features require the desktop app');
+      throw new Error('Voice features require the desktop app');
+    }
+
     setIsProcessing(true);
     setError(null);
 
     try {
+      const invoke = await getTauriInvoke();
       const response = await invoke<VoiceResponse>('send_text_to_speech', { text });
       setLastResponse(response);
 
@@ -401,7 +474,7 @@ export function useVoiceInteraction() {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [inTauri]);
 
   return {
     isProcessing,

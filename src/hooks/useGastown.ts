@@ -43,6 +43,11 @@ export async function runCommand(cmd: string, args: string[]): Promise<CommandRe
 // Check if in browser (for SSR safety)
 const isBrowser = typeof window !== 'undefined'
 
+// Check if running in Tauri desktop app
+function isTauri(): boolean {
+  return isBrowser && '__TAURI__' in window
+}
+
 // All hooks use real Tauri invocations - no mock data fallbacks
 
 // Parse bd list output

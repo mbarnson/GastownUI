@@ -548,82 +548,173 @@ pub async fn get_setup_status() -> Result<SetupStatus, String> {
     check_dependencies().await
 }
 
-/// Result of running a gt command
+/// Disk space information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GtCommandResult {
-    pub success: bool,
-    pub stdout: String,
-    pub stderr: String,
-    pub exit_code: i32,
+pub struct DiskSpaceInfo {
+    /// Available disk space in bytes
+    pub available_bytes: u64,
+    /// Total disk space in bytes
+    pub total_bytes: u64,
+    /// Whether there is sufficient space for voice model (4GB minimum)
+    pub sufficient_for_voice: bool,
+    /// Human-readable available space (e.g., "12.5 GB")
+    pub available_human: String,
+    /// Required space for voice model in bytes
+    pub required_bytes: u64,
+    /// Human-readable required space
+    pub required_human: String,
 }
 
-/// Install Gas Town to a path
-/// Runs: gt install <path> [--git]
-#[tauri::command]
-pub async fn gt_install(path: String, with_git: Option<bool>) -> Result<GtCommandResult, String> {
-    let resolved_path = expand_tilde(&path);
-    let path_str = resolved_path.to_string_lossy().to_string();
+/// Format bytes to human-readable string
+fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
 
-    let mut args = vec!["install".to_string(), path_str];
-    if with_git.unwrap_or(false) {
-        args.push("--git".to_string());
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} bytes", bytes)
+    }
+}
+
+/// Check available disk space
+/// Used by FTUE to determine if there's enough space for voice model download
+#[tauri::command]
+pub async fn check_disk_space() -> Result<DiskSpaceInfo, String> {
+    // Required space: 4GB for voice model (2-3GB model + temp space)
+    const REQUIRED_BYTES: u64 = 4 * 1024 * 1024 * 1024; // 4 GB
+
+    // Get home directory to check the disk where models will be stored
+    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+
+    #[cfg(target_os = "macos")]
+    {
+        // Use df to get disk space info on macOS
+        let output = Command::new("df")
+            .args(["-k", home.to_str().unwrap_or("/")])
+            .output()
+            .map_err(|e| format!("Failed to check disk space: {}", e))?;
+
+        if !output.status.success() {
+            return Err("Failed to check disk space".to_string());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = stdout.lines().collect();
+
+        if lines.len() < 2 {
+            return Err("Unexpected df output format".to_string());
+        }
+
+        // Parse the second line (first line is header)
+        // Format: Filesystem 1024-blocks Used Available Capacity ...
+        let parts: Vec<&str> = lines[1].split_whitespace().collect();
+        if parts.len() < 4 {
+            return Err("Unexpected df output format".to_string());
+        }
+
+        let total_kb: u64 = parts[1].parse().unwrap_or(0);
+        let available_kb: u64 = parts[3].parse().unwrap_or(0);
+
+        let total_bytes = total_kb * 1024;
+        let available_bytes = available_kb * 1024;
+
+        Ok(DiskSpaceInfo {
+            available_bytes,
+            total_bytes,
+            sufficient_for_voice: available_bytes >= REQUIRED_BYTES,
+            available_human: format_bytes(available_bytes),
+            required_bytes: REQUIRED_BYTES,
+            required_human: format_bytes(REQUIRED_BYTES),
+        })
     }
 
-    let output = Command::new("gt")
-        .args(&args)
-        .output()
-        .map_err(|e| format!("Failed to run gt install: {}", e))?;
+    #[cfg(target_os = "linux")]
+    {
+        // Use df command on Linux
+        let output = Command::new("df")
+            .args(["-k", home.to_str().unwrap_or("/")])
+            .output()
+            .map_err(|e| format!("Failed to check disk space: {}", e))?;
 
-    let exit_code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        if !output.status.success() {
+            return Err("Failed to check disk space".to_string());
+        }
 
-    Ok(GtCommandResult {
-        success: output.status.success(),
-        stdout,
-        stderr,
-        exit_code,
-    })
-}
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = stdout.lines().collect();
 
-/// Add a rig (Git repository) to the workspace
-/// Runs: gt rig add <name> <url>
-#[tauri::command]
-pub async fn gt_rig_add(name: String, url: String) -> Result<GtCommandResult, String> {
-    let output = Command::new("gt")
-        .args(["rig", "add", &name, &url])
-        .output()
-        .map_err(|e| format!("Failed to run gt rig add: {}", e))?;
+        if lines.len() < 2 {
+            return Err("Unexpected df output format".to_string());
+        }
 
-    let exit_code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let parts: Vec<&str> = lines[1].split_whitespace().collect();
+        if parts.len() < 4 {
+            return Err("Unexpected df output format".to_string());
+        }
 
-    Ok(GtCommandResult {
-        success: output.status.success(),
-        stdout,
-        stderr,
-        exit_code,
-    })
-}
+        let total_kb: u64 = parts[1].parse().unwrap_or(0);
+        let available_kb: u64 = parts[3].parse().unwrap_or(0);
 
-/// Start the Mayor agent
-/// Runs: gt mayor start
-#[tauri::command]
-pub async fn gt_mayor_start() -> Result<GtCommandResult, String> {
-    let output = Command::new("gt")
-        .args(["mayor", "start"])
-        .output()
-        .map_err(|e| format!("Failed to run gt mayor start: {}", e))?;
+        let total_bytes = total_kb * 1024;
+        let available_bytes = available_kb * 1024;
 
-    let exit_code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Ok(DiskSpaceInfo {
+            available_bytes,
+            total_bytes,
+            sufficient_for_voice: available_bytes >= REQUIRED_BYTES,
+            available_human: format_bytes(available_bytes),
+            required_bytes: REQUIRED_BYTES,
+            required_human: format_bytes(REQUIRED_BYTES),
+        })
+    }
 
-    Ok(GtCommandResult {
-        success: output.status.success(),
-        stdout,
-        stderr,
-        exit_code,
-    })
+    #[cfg(target_os = "windows")]
+    {
+        // Use wmic to get disk space on Windows
+        let output = Command::new("wmic")
+            .args(["logicaldisk", "where", "DeviceID='C:'", "get", "FreeSpace,Size", "/format:csv"])
+            .output()
+            .map_err(|e| format!("Failed to check disk space: {}", e))?;
+
+        if !output.status.success() {
+            return Err("Failed to check disk space".to_string());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // Parse CSV output
+        let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+
+        if lines.len() < 2 {
+            return Err("Unexpected wmic output format".to_string());
+        }
+
+        // Second line contains data
+        let parts: Vec<&str> = lines[1].split(',').collect();
+        if parts.len() < 3 {
+            return Err("Unexpected wmic output format".to_string());
+        }
+
+        let available_bytes: u64 = parts[1].trim().parse().unwrap_or(0);
+        let total_bytes: u64 = parts[2].trim().parse().unwrap_or(0);
+
+        Ok(DiskSpaceInfo {
+            available_bytes,
+            total_bytes,
+            sufficient_for_voice: available_bytes >= REQUIRED_BYTES,
+            available_human: format_bytes(available_bytes),
+            required_bytes: REQUIRED_BYTES,
+            required_human: format_bytes(REQUIRED_BYTES),
+        })
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        Err("Disk space check not supported on this platform".to_string())
+    }
 }

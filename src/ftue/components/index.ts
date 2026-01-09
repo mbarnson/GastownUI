@@ -8,3 +8,8 @@ export { MusicToggle, MusicIndicator } from './MusicToggle'
 export { GoInstallStep } from './GoInstallStep'
 export { CelebrationScene } from './CelebrationScene'
 export { VoiceScriptDisplay, VoiceScriptInline } from './VoiceScriptDisplay'
+export {
+  VoiceModelConsentScreen,
+  CheckingDiskSpaceScreen,
+  InsufficientSpaceScreen,
+} from './VoiceModelConsentScreen'

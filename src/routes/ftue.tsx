@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import React, { useReducer, useEffect, useMemo, useCallback, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import {
   ftueReducer,
   createInitialState,
@@ -11,12 +12,15 @@ import {
   SetupChecklist,
   Logo,
   MicrophoneIndicator,
+  VoiceScriptDisplay,
+  VoiceModelConsentScreen,
+  CheckingDiskSpaceScreen,
+  InsufficientSpaceScreen,
   getChecklistFromSetup,
+  getVoiceScript,
   useFTUEVoice,
-  useFTUEVoiceInput,
-  stepExpectsVoiceInput,
   type FTUEState,
-  type FTUEVoiceResponse,
+  type DiskSpaceInfo,
 } from '../ftue'
 
 export const Route = createFileRoute('/ftue')({
@@ -29,80 +33,17 @@ function FTUEPage() {
   const navigate = useNavigate()
   const [state, dispatch] = useReducer(ftueReducer, undefined, createInitialState)
   const detector = useMemo(() => getDetector(), [])
-  const [showTellMeMore, setShowTellMeMore] = useState(false)
 
-  // Handle voice responses - map to dispatcher actions
-  const handleVoiceResponse = useCallback((response: FTUEVoiceResponse, rawText: string) => {
-    switch (response) {
-      case 'proceed':
-        dispatch({ type: 'PROCEED' })
-        break
-      case 'tell_me_more':
-        setShowTellMeMore(true)
-        break
-      case 'skip':
-        dispatch({ type: 'SKIP' })
-        break
-      case 'add_rig':
-        dispatch({ type: 'START_ADD_RIG' })
-        break
-      case 'start_mayor':
-        dispatch({ type: 'START_MAYOR' })
-        break
-      case 'dashboard':
-        navigate({ to: '/' })
-        break
-      case 'somewhere_else':
-        // For custom workspace path - could show a text input or prompt
-        // For now, just stay on the same screen
-        break
-      case 'timeout':
-        // Silence timeout - could speak a prompt
-        // "No rush. Say 'ready' when you want to begin."
-        break
-      case 'unrecognized':
-        // Unrecognized speech - could prompt again
-        // "I didn't catch that..."
-        break
-    }
-  }, [navigate])
-
-  // Voice integration - playback
+  // Voice integration
   const {
     isSpeaking,
     isReady: voiceReady,
     speakDetection,
-    speakTellMeMore,
   } = useFTUEVoice({
     step: state.step,
     voiceEnabled: state.voiceEnabled,
     platform: state.setupState.platform,
-    onSpeakComplete: () => {
-      // Start listening for voice input after speaking (if step expects it)
-      if (state.voiceEnabled && stepExpectsVoiceInput(state.step)) {
-        voiceInput.startListening()
-      }
-    },
   })
-
-  // Voice input - recognition
-  const voiceInput = useFTUEVoiceInput({
-    step: state.step,
-    enabled: state.voiceEnabled && voiceReady && !isSpeaking,
-    silenceTimeout: 10000, // 10 seconds as per FTUE.md spec
-    onResponse: handleVoiceResponse,
-  })
-
-  // Handle "tell me more" - speak the explanation and then start listening again
-  useEffect(() => {
-    if (showTellMeMore && state.voiceEnabled && voiceReady) {
-      speakTellMeMore().then(() => {
-        setShowTellMeMore(false)
-        // Start listening for response after "tell me more"
-        voiceInput.startListening()
-      })
-    }
-  }, [showTellMeMore, state.voiceEnabled, voiceReady, speakTellMeMore, voiceInput])
 
   // Initial detection on mount
   useEffect(() => {
@@ -181,6 +122,50 @@ function FTUEPage() {
     }
   }, [detector])
 
+  // Voice consent handlers
+  const handleEnableVoice = useCallback(() => {
+    dispatch({ type: 'ENABLE_VOICE' })
+  }, [])
+
+  const handleSkipVoice = useCallback(() => {
+    dispatch({ type: 'SKIP_VOICE' })
+  }, [])
+
+  const handleCheckDiskSpaceAgain = useCallback(() => {
+    dispatch({ type: 'CHECK_DISK_SPACE_AGAIN' })
+  }, [])
+
+  // Check disk space when in checking_disk_space step
+  useEffect(() => {
+    if (state.step === 'checking_disk_space') {
+      invoke<{
+        available_bytes: number
+        total_bytes: number
+        sufficient_for_voice: boolean
+        available_human: string
+        required_bytes: number
+        required_human: string
+      }>('check_disk_space')
+        .then(result => {
+          // Convert snake_case from Rust to camelCase for TypeScript
+          const info: DiskSpaceInfo = {
+            availableBytes: result.available_bytes,
+            totalBytes: result.total_bytes,
+            sufficientForVoice: result.sufficient_for_voice,
+            availableHuman: result.available_human,
+            requiredBytes: result.required_bytes,
+            requiredHuman: result.required_human,
+          }
+          dispatch({ type: 'DISK_SPACE_CHECKED', info })
+        })
+        .catch(error => {
+          console.error('Failed to check disk space:', error)
+          // On error, proceed with text mode
+          dispatch({ type: 'SKIP_VOICE' })
+        })
+    }
+  }, [state.step])
+
   // Navigation handlers
   const handleProceed = useCallback(() => {
     dispatch({ type: 'PROCEED' })
@@ -200,6 +185,27 @@ function FTUEPage() {
 
   // Render based on current step
   switch (state.step) {
+    case 'consent':
+      return (
+        <VoiceModelConsentScreen
+          state={state}
+          onEnableVoice={handleEnableVoice}
+          onSkipVoice={handleSkipVoice}
+        />
+      )
+
+    case 'checking_disk_space':
+      return <CheckingDiskSpaceScreen message="Checking available disk space..." />
+
+    case 'insufficient_space':
+      return (
+        <InsufficientSpaceScreen
+          diskSpaceInfo={state.diskSpaceInfo!}
+          onCheckAgain={handleCheckDiskSpaceAgain}
+          onUseTextMode={handleSkipVoice}
+        />
+      )
+
     case 'checking_prerequisites':
       return <LoadingScreen message="Checking your system..." />
 
@@ -210,12 +216,12 @@ function FTUEPage() {
           onProceed={handleProceed}
           onSkip={handleSkip}
           onToggleVoice={handleToggleVoice}
-          isListening={voiceInput.isListening}
         />
       )
 
     case 'install_go':
-    case 'waiting_for_go':
+    case 'waiting_for_go': {
+      const goScript = getVoiceScript('install_go', state.setupState.platform)
       return (
         <InstallStep
           state={state}
@@ -224,7 +230,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          isListening={voiceInput.isListening}
+          scriptText={goScript?.text}
         >
           <InstallInstructions
             platform={state.setupState.platform}
@@ -235,9 +241,11 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
+    }
 
     case 'install_beads':
-    case 'waiting_for_beads':
+    case 'waiting_for_beads': {
+      const beadsScript = getVoiceScript('install_beads')
       return (
         <InstallStep
           state={state}
@@ -246,7 +254,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          isListening={voiceInput.isListening}
+          scriptText={beadsScript?.text}
         >
           <CommandBlock
             command="go install github.com/steveyegge/beads/cmd/bd@latest"
@@ -259,9 +267,11 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
+    }
 
     case 'install_gastown':
-    case 'waiting_for_gastown':
+    case 'waiting_for_gastown': {
+      const gtScript = getVoiceScript('install_gastown')
       return (
         <InstallStep
           state={state}
@@ -270,7 +280,7 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          isListening={voiceInput.isListening}
+          scriptText={gtScript?.text}
         >
           <CommandBlock
             command="go install github.com/steveyegge/gastown/cmd/gt@latest"
@@ -283,8 +293,10 @@ function FTUEPage() {
           )}
         </InstallStep>
       )
+    }
 
-    case 'configure_workspace':
+    case 'configure_workspace': {
+      const workspaceScript = getVoiceScript('configure_workspace')
       return (
         <WorkspaceConfigStep
           state={state}
@@ -292,9 +304,10 @@ function FTUEPage() {
           onToggleVoice={handleToggleVoice}
           onSkip={handleSkip}
           isSpeaking={isSpeaking}
-          isListening={voiceInput.isListening}
+          scriptText={workspaceScript?.text}
         />
       )
+    }
 
     case 'creating_workspace':
       return <LoadingScreen message="Creating your workspace..." />
@@ -317,7 +330,6 @@ function FTUEPage() {
           onAddRig={handleAddRig}
           onSkip={handleGoToDashboard}
           onToggleVoice={handleToggleVoice}
-          isListening={voiceInput.isListening}
         />
       )
 
@@ -355,7 +367,7 @@ function InstallStep({
   onToggleVoice,
   onSkip,
   isSpeaking = false,
-  isListening = false,
+  scriptText,
 }: {
   state: FTUEState
   title: string
@@ -364,19 +376,28 @@ function InstallStep({
   onToggleVoice: () => void
   onSkip: () => void
   isSpeaking?: boolean
-  isListening?: boolean
+  scriptText?: string
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col">
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-8">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 gap-6">
         <Logo size="md" />
 
         <div className="text-center max-w-lg">
           <h2 className="text-2xl font-bold text-slate-100 mb-2">{title}</h2>
           <p className="text-slate-400">{description}</p>
         </div>
+
+        {/* Show voice script as text when voice is disabled */}
+        {scriptText && (
+          <VoiceScriptDisplay
+            text={scriptText}
+            voiceEnabled={state.voiceEnabled}
+            title="What to do"
+          />
+        )}
 
         <div className="w-full max-w-lg">
           {children}
@@ -387,7 +408,6 @@ function InstallStep({
         <MicrophoneIndicator
           enabled={state.voiceEnabled}
           isSpeaking={isSpeaking}
-          isListening={isListening}
           onToggle={onToggleVoice}
         />
       </main>
@@ -411,14 +431,14 @@ function WorkspaceConfigStep({
   onToggleVoice,
   onSkip,
   isSpeaking = false,
-  isListening = false,
+  scriptText,
 }: {
   state: FTUEState
   onConfigure: (path: string) => void
   onToggleVoice: () => void
   onSkip: () => void
   isSpeaking?: boolean
-  isListening?: boolean
+  scriptText?: string
 }) {
   const checklist = getChecklistFromSetup(state.setupState)
   const defaultPath = '~/gt'
@@ -434,6 +454,15 @@ function WorkspaceConfigStep({
             Your Gas Town workspace is where all your projects and agents will live.
           </p>
         </div>
+
+        {/* Show voice script as text when voice is disabled */}
+        {scriptText && (
+          <VoiceScriptDisplay
+            text={scriptText}
+            voiceEnabled={state.voiceEnabled}
+            title="What to do"
+          />
+        )}
 
         <div className="w-full max-w-md bg-slate-800 rounded-xl p-6 border border-slate-700">
           <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -463,7 +492,6 @@ function WorkspaceConfigStep({
         <MicrophoneIndicator
           enabled={state.voiceEnabled}
           isSpeaking={isSpeaking}
-          isListening={isListening}
           onToggle={onToggleVoice}
         />
       </main>
@@ -486,13 +514,11 @@ function AddRigStep({
   onAddRig,
   onSkip,
   onToggleVoice,
-  isListening = false,
 }: {
   state: FTUEState
   onAddRig: (url: string) => void
   onSkip: () => void
   onToggleVoice: () => void
-  isListening?: boolean
 }) {
   const [gitUrl, setGitUrl] = useState('')
   const [isAdding, setIsAdding] = useState(false)
@@ -546,11 +572,7 @@ function AddRigStep({
           </button>
         </div>
 
-        <MicrophoneIndicator
-          enabled={state.voiceEnabled}
-          isListening={isListening}
-          onToggle={onToggleVoice}
-        />
+        <MicrophoneIndicator enabled={state.voiceEnabled} onToggle={onToggleVoice} />
       </main>
 
       <footer className="px-6 py-4 flex justify-center">
