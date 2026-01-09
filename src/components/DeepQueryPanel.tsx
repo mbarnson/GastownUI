@@ -145,8 +145,12 @@ export function DeepQueryPanel() {
           display: flex;
           flex-direction: column;
           height: 100%;
-          background: #1a1a2e;
-          border-radius: 8px;
+          background: var(--glass-bg);
+          backdrop-filter: blur(var(--glass-blur));
+          -webkit-backdrop-filter: blur(var(--glass-blur));
+          border: 1px solid var(--glass-border);
+          border-radius: var(--panel-radius);
+          box-shadow: var(--glass-shadow);
           overflow: hidden;
         }
 
@@ -154,48 +158,48 @@ export function DeepQueryPanel() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 12px 16px;
-          background: #16213e;
-          border-bottom: 1px solid #0f3460;
+          padding: var(--space-3) var(--space-4);
+          background: var(--glass-bg-strong);
+          border-bottom: 1px solid var(--glass-border);
         }
 
         .panel-header h3 {
           margin: 0;
-          color: #4ecca3;
-          font-size: 14px;
+          color: var(--accent-teal);
+          font-size: 0.875rem;
           font-weight: 600;
         }
 
         .status-badge .status {
-          font-size: 11px;
-          padding: 3px 8px;
-          border-radius: 4px;
+          font-size: 0.6875rem;
+          padding: 3px var(--space-2);
+          border-radius: var(--radius-sm);
         }
 
         .status.ready {
-          background: rgba(78, 204, 163, 0.2);
-          color: #4ecca3;
+          background: var(--accent-teal-muted);
+          color: var(--accent-teal);
         }
 
         .status.fallback {
-          background: rgba(249, 200, 70, 0.2);
-          color: #f9c846;
+          background: var(--accent-amber-muted);
+          color: var(--accent-amber);
         }
 
         .query-error {
-          padding: 8px 16px;
-          background: #e94560;
+          padding: var(--space-2) var(--space-4);
+          background: var(--color-error);
           color: white;
-          font-size: 12px;
+          font-size: 0.75rem;
         }
 
         .query-history {
           flex: 1;
           overflow-y: auto;
-          padding: 16px;
+          padding: var(--space-4);
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: var(--space-4);
         }
 
         .empty-state {
@@ -204,104 +208,105 @@ export function DeepQueryPanel() {
           align-items: center;
           justify-content: center;
           height: 100%;
-          color: #888;
+          color: var(--app-text-muted);
           text-align: center;
         }
 
         .empty-state p {
-          margin: 0 0 16px 0;
-          font-size: 14px;
+          margin: 0 0 var(--space-4) 0;
+          font-size: 0.875rem;
         }
 
         .example-queries {
           display: flex;
           flex-wrap: wrap;
-          gap: 8px;
+          gap: var(--space-2);
           justify-content: center;
         }
 
         .example-btn {
-          padding: 6px 12px;
-          background: #0f3460;
-          border: 1px solid #1a4480;
-          border-radius: 16px;
-          color: #aaa;
-          font-size: 12px;
+          padding: var(--space-1) var(--space-3);
+          background: var(--app-surface-30);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-full);
+          color: var(--app-text-muted);
+          font-size: 0.75rem;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all var(--transition-fast);
         }
 
         .example-btn:hover {
-          background: #1a4480;
-          color: #fff;
-          border-color: #4ecca3;
+          background: var(--app-surface-50);
+          color: var(--app-text);
+          border-color: var(--accent-teal);
+          box-shadow: var(--shadow-glow-success);
         }
 
         .query-item {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: var(--space-2);
         }
 
         .query-bubble {
-          padding: 10px 14px;
-          border-radius: 12px;
+          padding: var(--space-2) var(--space-3);
+          border-radius: var(--radius-lg);
           max-width: 85%;
         }
 
         .query-bubble.user {
           align-self: flex-end;
-          background: #0f3460;
-          color: #eee;
+          background: var(--color-primary);
+          color: white;
         }
 
         .query-bubble.assistant {
           align-self: flex-start;
-          background: #16213e;
-          border: 1px solid #0f3460;
-          color: #eee;
+          background: var(--glass-bg-strong);
+          border: 1px solid var(--glass-border);
+          color: var(--app-text);
         }
 
         .query-bubble.loading {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: var(--space-2);
         }
 
         .query-text {
-          font-size: 13px;
+          font-size: 0.8125rem;
         }
 
         .answer-text {
-          font-size: 13px;
+          font-size: 0.8125rem;
           line-height: 1.5;
           white-space: pre-wrap;
         }
 
         .query-meta {
           display: flex;
-          gap: 8px;
-          margin-top: 8px;
-          font-size: 10px;
-          color: #888;
+          gap: var(--space-2);
+          margin-top: var(--space-2);
+          font-size: 0.625rem;
+          color: var(--app-text-muted);
         }
 
         .context-badge {
-          background: rgba(78, 204, 163, 0.1);
-          color: #4ecca3;
-          padding: 2px 6px;
-          border-radius: 4px;
+          background: var(--accent-teal-muted);
+          color: var(--accent-teal);
+          padding: 2px var(--space-1);
+          border-radius: var(--radius-sm);
         }
 
         .loading-dots {
           display: flex;
-          gap: 4px;
+          gap: var(--space-1);
         }
 
         .loading-dots span {
           width: 6px;
           height: 6px;
-          background: #4ecca3;
+          background: var(--accent-teal);
           border-radius: 50%;
           animation: bounce 1.4s infinite ease-in-out both;
         }
@@ -311,51 +316,53 @@ export function DeepQueryPanel() {
         .loading-dots span:nth-child(3) { animation-delay: 0; }
 
         .loading-text {
-          font-size: 12px;
-          color: #888;
+          font-size: 0.75rem;
+          color: var(--app-text-muted);
         }
 
         .query-form {
           display: flex;
-          gap: 8px;
-          padding: 12px 16px;
-          background: #16213e;
-          border-top: 1px solid #0f3460;
+          gap: var(--space-2);
+          padding: var(--space-3) var(--space-4);
+          background: var(--glass-bg-strong);
+          border-top: 1px solid var(--glass-border);
         }
 
         .query-form input {
           flex: 1;
-          padding: 10px 14px;
-          background: #0f3460;
-          border: 1px solid #1a4480;
-          border-radius: 6px;
-          color: white;
-          font-size: 13px;
+          padding: var(--space-2) var(--space-3);
+          background: var(--app-surface-30);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-md);
+          color: var(--app-text);
+          font-size: 0.8125rem;
+          transition: all var(--transition-fast);
         }
 
         .query-form input:focus {
           outline: none;
-          border-color: #4ecca3;
+          border-color: var(--accent-teal);
+          box-shadow: 0 0 0 3px var(--accent-teal-muted);
         }
 
         .query-form input::placeholder {
-          color: #666;
+          color: var(--app-text-subtle);
         }
 
         .query-form button {
-          padding: 10px 20px;
-          background: #4ecca3;
+          padding: var(--space-2) var(--space-5);
+          background: var(--accent-teal);
           border: none;
-          border-radius: 6px;
+          border-radius: var(--radius-md);
           color: #000;
           font-weight: 600;
-          font-size: 13px;
+          font-size: 0.8125rem;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all var(--transition-fast);
         }
 
         .query-form button:hover:not(:disabled) {
-          background: #3db892;
+          box-shadow: var(--shadow-glow-success);
         }
 
         .query-form button:disabled {

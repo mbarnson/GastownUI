@@ -136,8 +136,12 @@ export function SelfTestPanel() {
 
       <style>{`
         .self-test-panel {
-          background: #1a1a2e;
-          border-radius: 8px;
+          background: var(--glass-bg);
+          backdrop-filter: blur(var(--glass-blur));
+          -webkit-backdrop-filter: blur(var(--glass-blur));
+          border: 1px solid var(--glass-border);
+          border-radius: var(--panel-radius);
+          box-shadow: var(--glass-shadow);
           overflow: hidden;
         }
 
@@ -145,84 +149,90 @@ export function SelfTestPanel() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 12px 16px;
-          background: #16213e;
-          border-bottom: 1px solid #0f3460;
+          padding: var(--space-3) var(--space-4);
+          background: var(--glass-bg-strong);
+          border-bottom: 1px solid var(--glass-border);
         }
 
         .panel-header h3 {
           margin: 0;
-          color: #f9c846;
-          font-size: 14px;
+          color: var(--accent-amber);
+          font-size: 0.875rem;
           font-weight: 600;
         }
 
         .status-indicator {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: var(--space-2);
         }
 
         .recording-dot {
           width: 10px;
           height: 10px;
-          background: #e94560;
+          background: var(--color-error);
           border-radius: 50%;
           animation: pulse 1s ease infinite;
+          box-shadow: 0 0 10px var(--color-error);
         }
 
         .pass-rate {
-          font-size: 12px;
+          font-size: 0.75rem;
           font-weight: 600;
-          padding: 2px 8px;
-          border-radius: 4px;
+          padding: 2px var(--space-2);
+          border-radius: var(--radius-sm);
         }
 
-        .pass-rate.good { background: #4ecca3; color: #000; }
-        .pass-rate.warn { background: #f9c846; color: #000; }
-        .pass-rate.bad { background: #e94560; color: #fff; }
+        .pass-rate.good { background: var(--color-success); color: #000; }
+        .pass-rate.warn { background: var(--color-warning); color: #000; }
+        .pass-rate.bad { background: var(--color-error); color: #fff; }
 
         .error-message {
-          padding: 8px 16px;
-          background: #e94560;
+          padding: var(--space-2) var(--space-4);
+          background: var(--color-error);
           color: white;
-          font-size: 12px;
+          font-size: 0.75rem;
         }
 
         .test-selection {
-          padding: 16px;
+          padding: var(--space-4);
         }
 
         .test-selection h4 {
-          margin: 0 0 12px 0;
-          color: #eee;
-          font-size: 12px;
+          margin: 0 0 var(--space-3) 0;
+          color: var(--app-text);
+          font-size: 0.75rem;
           text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .test-list {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          margin-bottom: 16px;
+          gap: var(--space-2);
+          margin-bottom: var(--space-4);
         }
 
         .test-item {
           display: flex;
           align-items: flex-start;
-          gap: 8px;
-          padding: 8px;
-          background: #0f3460;
-          border-radius: 4px;
+          gap: var(--space-2);
+          padding: var(--space-2);
+          background: var(--app-surface-30);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-md);
           cursor: pointer;
+          transition: all var(--transition-fast);
         }
 
         .test-item:hover {
-          background: #1a4480;
+          background: var(--app-surface-50);
+          border-color: var(--accent-amber);
         }
 
         .test-item input {
           margin-top: 2px;
+          accent-color: var(--accent-amber);
         }
 
         .test-info {
@@ -232,28 +242,29 @@ export function SelfTestPanel() {
         }
 
         .test-command {
-          color: #fff;
-          font-size: 13px;
+          color: var(--app-text);
+          font-size: 0.8125rem;
         }
 
         .test-action {
-          color: #888;
-          font-size: 11px;
+          color: var(--app-text-muted);
+          font-size: 0.6875rem;
         }
 
         .start-btn {
           width: 100%;
-          padding: 10px;
-          background: #4ecca3;
+          padding: var(--space-2);
+          background: var(--accent-teal);
           color: #000;
           border: none;
-          border-radius: 4px;
+          border-radius: var(--radius-md);
           font-weight: 600;
           cursor: pointer;
+          transition: all var(--transition-fast);
         }
 
         .start-btn:hover:not(:disabled) {
-          background: #3db892;
+          box-shadow: var(--shadow-glow-success);
         }
 
         .start-btn:disabled {
@@ -262,130 +273,136 @@ export function SelfTestPanel() {
         }
 
         .running-state {
-          padding: 16px;
+          padding: var(--space-4);
         }
 
         .progress-header {
           display: flex;
           justify-content: space-between;
-          color: #eee;
-          font-size: 13px;
-          margin-bottom: 8px;
+          color: var(--app-text);
+          font-size: 0.8125rem;
+          margin-bottom: var(--space-2);
         }
 
         .progress-bar {
           width: 100%;
           height: 6px;
-          background: #0f3460;
-          border-radius: 3px;
+          background: var(--app-surface-30);
+          border-radius: var(--radius-full);
           overflow: hidden;
         }
 
         .progress-fill {
           height: 100%;
-          background: #4ecca3;
-          transition: width 0.3s ease;
+          background: var(--accent-teal);
+          border-radius: var(--radius-full);
+          transition: width var(--transition-slow);
         }
 
         .current-test {
-          margin-top: 8px;
-          color: #888;
-          font-size: 12px;
+          margin-top: var(--space-2);
+          color: var(--app-text-muted);
+          font-size: 0.75rem;
         }
 
         .stop-btn {
           width: 100%;
-          margin-top: 12px;
-          padding: 8px;
-          background: #e94560;
+          margin-top: var(--space-3);
+          padding: var(--space-2);
+          background: var(--color-error);
           color: white;
           border: none;
-          border-radius: 4px;
+          border-radius: var(--radius-md);
           cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+
+        .stop-btn:hover {
+          box-shadow: var(--shadow-glow-accent);
         }
 
         .test-results {
-          padding: 16px;
-          border-top: 1px solid #0f3460;
+          padding: var(--space-4);
+          border-top: 1px solid var(--glass-border);
         }
 
         .test-results h4 {
-          margin: 0 0 12px 0;
-          color: #eee;
-          font-size: 12px;
+          margin: 0 0 var(--space-3) 0;
+          color: var(--app-text);
+          font-size: 0.75rem;
         }
 
         .results-list {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: var(--space-2);
           max-height: 300px;
           overflow-y: auto;
         }
 
         .result-item {
-          padding: 8px;
-          border-radius: 4px;
+          padding: var(--space-2);
+          border-radius: var(--radius-md);
           border-left: 3px solid;
         }
 
         .result-item.passed {
-          background: rgba(78, 204, 163, 0.1);
-          border-color: #4ecca3;
+          background: var(--color-success-muted);
+          border-color: var(--color-success);
         }
 
         .result-item.failed {
-          background: rgba(233, 69, 96, 0.1);
-          border-color: #e94560;
+          background: var(--color-error-muted);
+          border-color: var(--color-error);
         }
 
         .result-header {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: var(--space-2);
         }
 
         .result-icon {
-          font-size: 14px;
+          font-size: 0.875rem;
         }
 
-        .result-item.passed .result-icon { color: #4ecca3; }
-        .result-item.failed .result-icon { color: #e94560; }
+        .result-item.passed .result-icon { color: var(--color-success); }
+        .result-item.failed .result-icon { color: var(--color-error); }
 
         .result-command {
           flex: 1;
-          color: #eee;
-          font-size: 12px;
+          color: var(--app-text);
+          font-size: 0.75rem;
         }
 
         .result-duration {
-          color: #888;
-          font-size: 10px;
+          color: var(--app-text-muted);
+          font-size: 0.625rem;
         }
 
         .result-details {
-          margin-top: 4px;
+          margin-top: var(--space-1);
           padding-left: 22px;
         }
 
         .verifier-output {
-          color: #aaa;
-          font-size: 11px;
+          color: var(--app-text-subtle);
+          font-size: 0.6875rem;
           font-style: italic;
         }
 
         .summary {
           display: flex;
           justify-content: space-between;
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px solid #0f3460;
-          font-size: 12px;
-          color: #888;
+          margin-top: var(--space-3);
+          padding-top: var(--space-3);
+          border-top: 1px solid var(--glass-border);
+          font-size: 0.75rem;
+          color: var(--app-text-muted);
         }
 
-        .summary .pass { color: #4ecca3; }
-        .summary .fail { color: #e94560; }
+        .summary .pass { color: var(--color-success); }
+        .summary .fail { color: var(--color-error); }
 
         @keyframes pulse {
           0%, 100% { opacity: 1; }
