@@ -12,6 +12,16 @@ export type FTUEStep =
   | 'waiting_for_gastown'
   | 'configure_workspace'
   | 'creating_workspace'
+  // Voice model setup
+  | 'voice_setup_check'
+  | 'voice_disk_space_error'
+  | 'voice_downloading'
+  | 'voice_download_error'
+  | 'voice_integrity_error'
+  | 'voice_partial_error'
+  | 'voice_starting_server'
+  | 'voice_ready'
+  // Completion
   | 'complete'
   | 'add_first_rig'
   | 'start_mayor'

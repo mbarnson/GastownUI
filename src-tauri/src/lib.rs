@@ -70,6 +70,7 @@ pub fn run() {
             chunked_download::pause_download,
             chunked_download::resume_download,
             chunked_download::cancel_download,
+            chunked_download::retry_failed_chunks,
             chunked_download::get_download_status,
             chunked_download::list_downloads,
         ])

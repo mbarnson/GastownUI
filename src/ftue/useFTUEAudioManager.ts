@@ -27,6 +27,31 @@ export const VOICE_SCRIPTS: Partial<Record<FTUEStep, VoiceScript>> = {
   welcome: {
     text: "Hey there! I'm your Gas Town assistant. I'll be helping you get set up—it usually takes about five minutes. Before we start, I should mention: Gas Town is designed for developers who are comfortable in the terminal and ready to run multiple AI coding agents in parallel. It's powerful, but it does use real API credits. Say 'let's go' when you're ready, or 'tell me more' if you want to know what we're setting up.",
   },
+  // Voice model setup steps
+  voice_setup_check: {
+    text: "Let me check if the voice model is ready. This is what lets me talk to you instead of just displaying text.",
+  },
+  voice_disk_space_error: {
+    text: "Hmm, looks like you'll need about four gigabytes free to download the voice model. You can free up some space and try again, or continue with text-only mode for now.",
+  },
+  voice_downloading: {
+    text: "Downloading the voice model now. This is about one and a half gigabytes, so it might take a few minutes depending on your connection.",
+  },
+  voice_download_error: {
+    text: "The download seems to have run into some trouble. Want to try again? Sometimes network issues are just temporary.",
+  },
+  voice_integrity_error: {
+    text: "The download seems to have gotten corrupted. I've cleaned up the bad file. Want to try downloading again?",
+  },
+  voice_partial_error: {
+    text: "Some parts of the download didn't complete successfully. I've saved your progress though. Want to retry just the parts that failed?",
+  },
+  voice_starting_server: {
+    text: "Almost there. Starting up the voice server...",
+  },
+  voice_ready: {
+    text: "Voice is ready! You can now talk to me, or type if you prefer.",
+  },
   install_go: {
     text: "First thing we need is Go—it's the programming language that Gas Town and Beads are written in.",
     variants: [

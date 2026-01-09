@@ -78,6 +78,27 @@ export interface ModelDownloadProgress {
   error?: string;
 }
 
+export interface ChunkRetryInfo {
+  chunkIndex: number;
+  attempt: number;
+  maxAttempts: number;
+  error: string;
+}
+
+export interface DownloadFailureInfo {
+  failedChunks: number;
+  totalChunks: number;
+  errors: Array<{ chunkIndex: number; error: string }>;
+  canRetry: boolean;
+}
+
+export interface IntegrityFailureInfo {
+  expectedSha256: string;
+  actualSha256: string;
+  canRetry: boolean;
+  message: string;
+}
+
 export interface OverallDownloadProgress {
   totalFiles: number;
   completedFiles: number;
@@ -85,9 +106,14 @@ export interface OverallDownloadProgress {
   totalBytes: number;
   downloadedBytes: number;
   overallProgress: number;
-  status: 'idle' | 'checking' | 'downloading' | 'complete' | 'error';
+  status: 'idle' | 'checking' | 'downloading' | 'complete' | 'error' | 'partial_failure' | 'integrity_failure';
   error?: string;
   fileProgress: ModelDownloadProgress[];
+  // Error recovery state
+  retryingChunk?: ChunkRetryInfo;
+  partialFailure?: DownloadFailureInfo;
+  integrityFailure?: IntegrityFailureInfo;
+  canRetry: boolean;
 }
 
 // ============================================================================
@@ -149,13 +175,19 @@ export function useVoiceModelDownload() {
     overallProgress: 0,
     status: 'idle',
     fileProgress: [],
+    canRetry: false,
   });
+  const [lastDownloadId, setLastDownloadId] = useState<string | null>(null);
 
   // Listen for download progress events
   useEffect(() => {
     let unlistenProgress: (() => void) | null = null;
     let unlistenComplete: (() => void) | null = null;
     let unlistenError: (() => void) | null = null;
+    let unlistenChunkRetry: (() => void) | null = null;
+    let unlistenPartialFailure: (() => void) | null = null;
+    let unlistenIntegrityFailure: (() => void) | null = null;
+    let unlistenRetryStarted: (() => void) | null = null;
 
     const setupListeners = async () => {
       unlistenProgress = await listen<DownloadStatus>('download-progress', (event) => {
@@ -182,6 +214,8 @@ export function useVoiceModelDownload() {
             downloadedBytes,
             overallProgress,
             fileProgress,
+            // Clear retry info on progress updates
+            retryingChunk: undefined,
           };
         });
       });
@@ -204,12 +238,16 @@ export function useVoiceModelDownload() {
             fileProgress,
             status: isComplete ? 'complete' : prev.status,
             currentFile: isComplete ? null : prev.currentFile,
+            canRetry: false,
+            partialFailure: undefined,
+            integrityFailure: undefined,
           };
         });
       });
 
       unlistenError = await listen<[string, string]>('download-error', (event) => {
         const [downloadId, error] = event.payload;
+        setLastDownloadId(downloadId);
         setProgress(prev => {
           const fileProgress = prev.fileProgress.map(fp =>
             fp.downloadId === downloadId
@@ -222,8 +260,77 @@ export function useVoiceModelDownload() {
             status: 'error',
             error: `Download failed: ${error}`,
             fileProgress,
+            canRetry: true,
           };
         });
+      });
+
+      // Listen for chunk retry events (individual chunk retrying)
+      unlistenChunkRetry = await listen<{
+        id: string;
+        chunkIndex: number;
+        attempt: number;
+        maxAttempts: number;
+        error: string;
+      }>('download-chunk-retry', (event) => {
+        const { chunkIndex, attempt, maxAttempts, error } = event.payload;
+        setProgress(prev => ({
+          ...prev,
+          retryingChunk: { chunkIndex, attempt, maxAttempts, error },
+        }));
+      });
+
+      // Listen for partial failure (some chunks failed after all retries)
+      unlistenPartialFailure = await listen<{
+        id: string;
+        failedChunks: number;
+        totalChunks: number;
+        errors: Array<{ chunkIndex: number; error: string }>;
+        canRetry: boolean;
+      }>('download-partial-failure', (event) => {
+        const { id, failedChunks, totalChunks, errors, canRetry } = event.payload;
+        setLastDownloadId(id);
+        setProgress(prev => ({
+          ...prev,
+          status: 'partial_failure',
+          error: `${failedChunks} of ${totalChunks} chunks failed. Progress saved.`,
+          partialFailure: { failedChunks, totalChunks, errors, canRetry },
+          canRetry,
+        }));
+      });
+
+      // Listen for integrity failure (SHA256 mismatch)
+      unlistenIntegrityFailure = await listen<{
+        id: string;
+        expectedSha256: string;
+        actualSha256: string;
+        canRetry: boolean;
+        message: string;
+      }>('download-integrity-failure', (event) => {
+        const { id, expectedSha256, actualSha256, canRetry, message } = event.payload;
+        setLastDownloadId(id);
+        setProgress(prev => ({
+          ...prev,
+          status: 'integrity_failure',
+          error: message,
+          integrityFailure: { expectedSha256, actualSha256, canRetry, message },
+          canRetry,
+        }));
+      });
+
+      // Listen for retry started event
+      unlistenRetryStarted = await listen<{
+        id: string;
+        chunksToRetry: number;
+      }>('download-retry-started', (event) => {
+        setProgress(prev => ({
+          ...prev,
+          status: 'downloading',
+          error: undefined,
+          partialFailure: undefined,
+          integrityFailure: undefined,
+          canRetry: false,
+        }));
       });
     };
 
@@ -233,6 +340,10 @@ export function useVoiceModelDownload() {
       unlistenProgress?.();
       unlistenComplete?.();
       unlistenError?.();
+      unlistenChunkRetry?.();
+      unlistenPartialFailure?.();
+      unlistenIntegrityFailure?.();
+      unlistenRetryStarted?.();
     };
   }, []);
 
@@ -365,15 +476,51 @@ export function useVoiceModelDownload() {
       overallProgress: 0,
       status: 'idle',
       fileProgress: [],
+      canRetry: false,
     });
+    setLastDownloadId(null);
   }, []);
+
+  // Retry failed chunks mutation
+  const retryFailedMutation = useMutation({
+    mutationFn: async () => {
+      if (!lastDownloadId) {
+        throw new Error('No download to retry');
+      }
+
+      // For partial failures, retry the failed chunks
+      if (progress.partialFailure) {
+        await invoke('retry_failed_chunks', { id: lastDownloadId });
+      }
+      // For integrity failures or general errors, restart the download
+      else {
+        // Reset and restart
+        reset();
+        startDownloadMutation.mutate();
+      }
+    },
+    onError: (error) => {
+      setProgress(prev => ({
+        ...prev,
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+        canRetry: true,
+      }));
+    },
+  });
 
   return {
     progress,
+    lastDownloadId,
     isDownloading: progress.status === 'downloading' || progress.status === 'checking',
     isComplete: progress.status === 'complete',
-    hasError: progress.status === 'error',
+    hasError: progress.status === 'error' || progress.status === 'partial_failure' || progress.status === 'integrity_failure',
+    isPartialFailure: progress.status === 'partial_failure',
+    isIntegrityFailure: progress.status === 'integrity_failure',
+    canRetry: progress.canRetry,
     startDownload: startDownloadMutation.mutate,
+    retryDownload: retryFailedMutation.mutate,
+    isRetrying: retryFailedMutation.isPending,
     reset,
   };
 }
@@ -390,12 +537,14 @@ export function useVoiceModelSetup() {
   const isReady = modelStatus.data?.installed ?? false;
   const needsSetup = !isReady && !modelStatus.isLoading;
   const canDownload = diskSpace.data?.hasSufficientSpace ?? false;
+  const insufficientSpace = diskSpace.data && !diskSpace.data.hasSufficientSpace;
 
   return {
     // Status
     isReady,
     needsSetup,
     canDownload,
+    insufficientSpace,
     isLoading: modelStatus.isLoading || modelInfo.isLoading || diskSpace.isLoading,
 
     // Data
@@ -408,7 +557,12 @@ export function useVoiceModelSetup() {
     isDownloading: download.isDownloading,
     downloadComplete: download.isComplete,
     downloadError: download.hasError,
+    isPartialFailure: download.isPartialFailure,
+    isIntegrityFailure: download.isIntegrityFailure,
+    canRetry: download.canRetry,
     startDownload: download.startDownload,
+    retryDownload: download.retryDownload,
+    isRetrying: download.isRetrying,
     resetDownload: download.reset,
 
     // Refresh

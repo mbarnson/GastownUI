@@ -15,6 +15,10 @@ use uuid::Uuid;
 const CHUNK_SIZE: u64 = 64 * 1024 * 1024;
 /// Maximum parallel downloads
 const MAX_PARALLEL_DOWNLOADS: usize = 8;
+/// Maximum retry attempts for failed chunks
+const MAX_RETRY_ATTEMPTS: u32 = 3;
+/// Base delay for exponential backoff (in milliseconds)
+const BACKOFF_BASE_MS: u64 = 1000;
 
 /// Download status for a single file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +58,12 @@ struct ChunkStatus {
     downloaded: u64,
     complete: bool,
     sha256: Option<String>,
+    /// Number of failed retry attempts for this chunk
+    retry_count: u32,
+    /// Whether this chunk permanently failed (exceeded max retries)
+    failed: bool,
+    /// Last error message if failed
+    last_error: Option<String>,
 }
 
 /// Progress file for resume support
@@ -190,6 +200,9 @@ pub async fn start_chunked_download(
                 downloaded: 0,
                 complete: false,
                 sha256: None,
+                retry_count: 0,
+                failed: false,
+                last_error: None,
             }
         })
         .collect();
@@ -379,6 +392,59 @@ pub async fn cancel_download(
     Ok(())
 }
 
+/// Retry failed chunks in a partially completed download
+#[tauri::command]
+pub async fn retry_failed_chunks(
+    app: AppHandle,
+    state: State<'_, DownloadManagerState>,
+    id: String,
+) -> Result<(), String> {
+    // Load existing progress
+    let progress = state
+        .load_progress(&id)
+        .await
+        .ok_or("No progress file found - cannot retry")?;
+
+    // Find failed chunks and reset their status
+    let failed_count = progress.chunks.iter().filter(|c| c.failed).count();
+    if failed_count == 0 {
+        return Err("No failed chunks to retry".into());
+    }
+
+    log::info!(
+        "Retrying {} failed chunks for download {}",
+        failed_count,
+        id
+    );
+
+    // Reset failed chunks in progress
+    let mut updated_progress = progress.clone();
+    for chunk in &mut updated_progress.chunks {
+        if chunk.failed {
+            chunk.failed = false;
+            chunk.retry_count = 0;
+            chunk.last_error = None;
+            chunk.complete = false;
+            chunk.downloaded = 0;
+        }
+    }
+
+    // Save updated progress
+    state.save_progress(&updated_progress).await?;
+
+    // Emit retry starting event
+    let _ = app.emit(
+        "download-retry-started",
+        serde_json::json!({
+            "id": &id,
+            "chunksToRetry": failed_count
+        }),
+    );
+
+    // Resume the download (will pick up incomplete chunks)
+    resume_download(app, state, id).await
+}
+
 /// Get download status
 #[tauri::command]
 pub async fn get_download_status(
@@ -399,6 +465,85 @@ pub async fn list_downloads(
 ) -> Result<Vec<DownloadStatus>, String> {
     let downloads = state.downloads.read().await;
     Ok(downloads.values().map(|d| d.status.clone()).collect())
+}
+
+/// Download a single chunk with proper error handling
+async fn download_single_chunk(
+    client: &Client,
+    url: &str,
+    chunk: &ChunkStatus,
+    file: Arc<Mutex<File>>,
+    downloads: Arc<RwLock<HashMap<String, ActiveDownload>>>,
+    id: &str,
+    app: &AppHandle,
+) -> Result<(), String> {
+    // Download chunk with range request
+    let range = format!("bytes={}-{}", chunk.start, chunk.end);
+    let resp = client
+        .get(url)
+        .header(reqwest::header::RANGE, &range)
+        .send()
+        .await
+        .map_err(|e| format!("Request error: {}", e))?;
+
+    if !resp.status().is_success() && resp.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+        return Err(format!("HTTP error: {}", resp.status()));
+    }
+
+    let mut stream = resp.bytes_stream();
+    let mut offset = chunk.start;
+    let mut chunk_downloaded = 0u64;
+
+    while let Some(bytes) = stream.next().await {
+        let bytes = bytes.map_err(|e| format!("Stream error: {}", e))?;
+
+        // Write to file at correct offset
+        {
+            let mut file = file.lock().await;
+            file.seek(SeekFrom::Start(offset))
+                .await
+                .map_err(|e| format!("Seek error: {}", e))?;
+            file.write_all(&bytes)
+                .await
+                .map_err(|e| format!("Write error: {}", e))?;
+        }
+
+        offset += bytes.len() as u64;
+        chunk_downloaded += bytes.len() as u64;
+
+        // Update progress
+        {
+            let mut downloads = downloads.write().await;
+            if let Some(download) = downloads.get_mut(id) {
+                download.status.downloaded += bytes.len() as u64;
+                download.status.progress = (download.status.downloaded as f32
+                    / download.status.total_size as f32)
+                    * 100.0;
+
+                // Emit progress event
+                let _ = app.emit("download-progress", &download.status);
+            }
+        }
+    }
+
+    // Mark chunk complete
+    {
+        let mut downloads = downloads.write().await;
+        if let Some(download) = downloads.get_mut(id) {
+            if let Some(chunk_status) = download
+                .progress
+                .chunks
+                .iter_mut()
+                .find(|c| c.index == chunk.index)
+            {
+                chunk_status.complete = true;
+                chunk_status.downloaded = chunk_downloaded;
+            }
+            download.status.chunks_completed += 1;
+        }
+    }
+
+    Ok(())
 }
 
 /// Download file with parallel chunk downloads
@@ -473,84 +618,192 @@ async fn download_file(
                 }
             }
 
-            // Download chunk with range request
-            let range = format!("bytes={}-{}", chunk.start, chunk.end);
-            let resp = client
-                .get(&url)
-                .header(reqwest::header::RANGE, &range)
-                .send()
+            // Retry loop with exponential backoff
+            let mut attempt = 0u32;
+            let mut last_error = String::new();
+
+            loop {
+                attempt += 1;
+
+                // Check cancel flag before each attempt
+                {
+                    let downloads = downloads.read().await;
+                    if let Some(download) = downloads.get(&id) {
+                        if *download.cancel_flag.read().await {
+                            return Err("Cancelled".to_string());
+                        }
+                    }
+                }
+
+                match download_single_chunk(
+                    &client,
+                    &url,
+                    &chunk,
+                    file.clone(),
+                    downloads.clone(),
+                    &id,
+                    &app,
+                )
                 .await
-                .map_err(|e| format!("Request error: {}", e))?;
-
-            if !resp.status().is_success() {
-                return Err(format!("HTTP error: {}", resp.status()));
-            }
-
-            let mut stream = resp.bytes_stream();
-            let mut offset = chunk.start;
-            let mut chunk_downloaded = 0u64;
-
-            while let Some(bytes) = stream.next().await {
-                let bytes = bytes.map_err(|e| format!("Stream error: {}", e))?;
-
-                // Write to file at correct offset
                 {
-                    let mut file = file.lock().await;
-                    file.seek(SeekFrom::Start(offset))
-                        .await
-                        .map_err(|e| format!("Seek error: {}", e))?;
-                    file.write_all(&bytes)
-                        .await
-                        .map_err(|e| format!("Write error: {}", e))?;
-                }
+                    Ok(()) => {
+                        // Success - chunk completed
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        last_error = e.clone();
+                        log::warn!(
+                            "Chunk {} failed attempt {}/{}: {}",
+                            chunk.index,
+                            attempt,
+                            MAX_RETRY_ATTEMPTS,
+                            e
+                        );
 
-                offset += bytes.len() as u64;
-                chunk_downloaded += bytes.len() as u64;
+                        // Emit retry event
+                        let _ = app.emit(
+                            "download-chunk-retry",
+                            serde_json::json!({
+                                "id": &id,
+                                "chunkIndex": chunk.index,
+                                "attempt": attempt,
+                                "maxAttempts": MAX_RETRY_ATTEMPTS,
+                                "error": &e
+                            }),
+                        );
 
-                // Update progress
-                {
-                    let mut downloads = downloads.write().await;
-                    if let Some(download) = downloads.get_mut(&id) {
-                        download.status.downloaded += bytes.len() as u64;
-                        download.status.progress = (download.status.downloaded as f32
-                            / download.status.total_size as f32)
-                            * 100.0;
+                        // Update retry count in progress
+                        {
+                            let mut downloads = downloads.write().await;
+                            if let Some(download) = downloads.get_mut(&id) {
+                                if let Some(chunk_status) = download
+                                    .progress
+                                    .chunks
+                                    .iter_mut()
+                                    .find(|c| c.index == chunk.index)
+                                {
+                                    chunk_status.retry_count = attempt;
+                                    chunk_status.last_error = Some(e.clone());
+                                }
+                            }
+                        }
 
-                        // Emit progress event
-                        let _ = app.emit("download-progress", &download.status);
+                        if attempt >= MAX_RETRY_ATTEMPTS {
+                            // Mark chunk as permanently failed
+                            {
+                                let mut downloads = downloads.write().await;
+                                if let Some(download) = downloads.get_mut(&id) {
+                                    if let Some(chunk_status) = download
+                                        .progress
+                                        .chunks
+                                        .iter_mut()
+                                        .find(|c| c.index == chunk.index)
+                                    {
+                                        chunk_status.failed = true;
+                                    }
+                                }
+                            }
+
+                            // Emit chunk failure event (not fatal - download continues)
+                            let _ = app.emit(
+                                "download-chunk-failed",
+                                serde_json::json!({
+                                    "id": &id,
+                                    "chunkIndex": chunk.index,
+                                    "error": &last_error,
+                                    "canRetryLater": true
+                                }),
+                            );
+
+                            // Return error but allow other chunks to continue
+                            return Err(format!(
+                                "Chunk {} failed after {} attempts: {}",
+                                chunk.index, MAX_RETRY_ATTEMPTS, last_error
+                            ));
+                        }
+
+                        // Exponential backoff: 1s, 2s, 4s
+                        let delay_ms = BACKOFF_BASE_MS * 2u64.pow(attempt - 1);
+                        log::info!(
+                            "Retrying chunk {} in {}ms...",
+                            chunk.index,
+                            delay_ms
+                        );
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
                     }
                 }
             }
-
-            // Mark chunk complete
-            {
-                let mut downloads = downloads.write().await;
-                if let Some(download) = downloads.get_mut(&id) {
-                    if let Some(chunk_status) = download
-                        .progress
-                        .chunks
-                        .iter_mut()
-                        .find(|c| c.index == chunk.index)
-                    {
-                        chunk_status.complete = true;
-                        chunk_status.downloaded = chunk_downloaded;
-                    }
-                    download.status.chunks_completed += 1;
-                }
-            }
-
-            Ok::<_, String>(())
         });
 
         handles.push(handle);
     }
 
-    // Wait for all chunks
+    // Wait for all chunks, collecting errors
+    let mut failed_chunks: Vec<(usize, String)> = Vec::new();
     for handle in handles {
-        handle
-            .await
-            .map_err(|e| format!("Join error: {}", e))?
-            .map_err(|e| e)?;
+        match handle.await {
+            Ok(Ok(())) => {
+                // Chunk succeeded
+            }
+            Ok(Err(e)) => {
+                // Chunk failed after retries - extract chunk index from error message
+                log::warn!("Chunk download failed: {}", e);
+                // Extract chunk index from error (format: "Chunk N failed...")
+                if let Some(idx) = e
+                    .strip_prefix("Chunk ")
+                    .and_then(|s| s.split_whitespace().next())
+                    .and_then(|s| s.parse::<usize>().ok())
+                {
+                    failed_chunks.push((idx, e));
+                }
+            }
+            Err(e) => {
+                // Task panicked
+                log::error!("Chunk download task panicked: {}", e);
+            }
+        }
+    }
+
+    // Check if any chunks failed permanently
+    if !failed_chunks.is_empty() {
+        // Get total chunk count from downloads state
+        let total_chunks = {
+            let downloads = downloads.read().await;
+            downloads
+                .get(id)
+                .map(|d| d.progress.chunks.len())
+                .unwrap_or(0)
+        };
+
+        let _ = app.emit(
+            "download-partial-failure",
+            serde_json::json!({
+                "id": id,
+                "failedChunks": failed_chunks.len(),
+                "totalChunks": total_chunks,
+                "errors": failed_chunks.iter().map(|(idx, e)| {
+                    serde_json::json!({ "chunkIndex": idx, "error": e })
+                }).collect::<Vec<_>>(),
+                "canRetry": true
+            }),
+        );
+
+        // Save progress so user can retry later
+        {
+            let downloads = downloads.read().await;
+            if let Some(download) = downloads.get(id) {
+                let progress_path = download_dir.join(format!("{}.progress.json", id));
+                let content = serde_json::to_string_pretty(&download.progress)
+                    .unwrap_or_default();
+                let _ = fs::write(&progress_path, content).await;
+            }
+        }
+
+        return Err(format!(
+            "Download incomplete: {} of {} chunks failed. Progress saved - retry later.",
+            failed_chunks.len(),
+            total_chunks
+        ));
     }
 
     // Verify SHA256 if provided
@@ -566,9 +819,37 @@ async fn download_file(
 
         let actual = compute_sha256(&partial_path).await?;
         if actual.to_lowercase() != expected.to_lowercase() {
+            // Integrity failure - delete corrupted file
+            log::error!(
+                "SHA256 mismatch for {}: expected {}, got {}",
+                id,
+                expected,
+                actual
+            );
+
+            // Delete the corrupted partial file
+            if let Err(e) = fs::remove_file(&partial_path).await {
+                log::warn!("Failed to delete corrupted file: {}", e);
+            }
+
+            // Clear progress so retry starts fresh
+            let progress_path = download_dir.join(format!("{}.progress.json", id));
+            let _ = fs::remove_file(&progress_path).await;
+
+            // Emit integrity failure event with retry option
+            let _ = app.emit(
+                "download-integrity-failure",
+                serde_json::json!({
+                    "id": id,
+                    "expectedSha256": expected,
+                    "actualSha256": actual,
+                    "canRetry": true,
+                    "message": "The download seems to have gotten corrupted. Want to try again?"
+                }),
+            );
+
             return Err(format!(
-                "SHA256 mismatch: expected {}, got {}",
-                expected, actual
+                "Integrity check failed: file corrupted (SHA256 mismatch). File deleted - retry download."
             ));
         }
     }
