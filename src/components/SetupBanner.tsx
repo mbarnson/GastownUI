@@ -20,11 +20,9 @@ export function SetupBanner({ className = '' }: SetupBannerProps) {
   // - Not loaded yet
   // - Banner was dismissed
   // - Setup is complete (both Go and Beads installed)
-  // - Setup was never skipped and not interrupted
   if (!isLoaded) return null;
   if (preferences.setupDismissed) return null;
   if (status && isSetupComplete(status)) return null;
-  if (!preferences.setupSkipped && !isInterrupted) return null;
 
   const handleCompleteSetup = () => {
     resetSkip(); // Clear the skip flag
