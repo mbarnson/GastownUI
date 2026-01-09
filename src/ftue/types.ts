@@ -341,3 +341,111 @@ export function determineStartStep(setupState: SetupState): FTUEStep {
 
   return 'welcome'
 }
+
+// ============================================================================
+// Text Mode Accessibility Types
+// ============================================================================
+
+/**
+ * Text mode settings for accessibility
+ */
+export interface TextModeSettings {
+  /** Whether text-only mode is enabled (no voice) */
+  enabled: boolean
+  /** Whether to show keyboard shortcuts hint */
+  showKeyboardHints: boolean
+  /** Whether to respect reduced motion preferences */
+  respectReducedMotion: boolean
+  /** Font size multiplier for readability */
+  fontSizeMultiplier: number
+  /** High contrast mode for better visibility */
+  highContrast: boolean
+}
+
+/** Default text mode settings */
+export const DEFAULT_TEXT_MODE_SETTINGS: TextModeSettings = {
+  enabled: false,
+  showKeyboardHints: true,
+  respectReducedMotion: true,
+  fontSizeMultiplier: 1.0,
+  highContrast: false,
+}
+
+/**
+ * Navigation direction for keyboard/button navigation
+ */
+export type NavigationDirection = 'next' | 'back' | 'skip'
+
+/**
+ * Step navigation event
+ */
+export interface StepNavigationEvent {
+  direction: NavigationDirection
+  fromStep: FTUEStep
+  toStep: FTUEStep | null
+  source: 'keyboard' | 'button' | 'auto'
+}
+
+/**
+ * Keyboard shortcut configuration
+ */
+export interface KeyboardShortcuts {
+  next: string[]  // e.g., ['Enter', 'ArrowRight']
+  back: string[]  // e.g., ['ArrowLeft', 'Backspace']
+  skip: string[]  // e.g., ['Escape']
+  help: string[]  // e.g., ['?', 'F1']
+}
+
+/** Default keyboard shortcuts */
+export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
+  next: ['Enter', 'ArrowRight'],
+  back: ['ArrowLeft', 'Backspace'],
+  skip: ['Escape'],
+  help: ['?'],
+}
+
+/**
+ * Text mode step definition with content
+ */
+export interface TextModeStepDefinition {
+  id: FTUEStep
+  label: string
+  description: string
+  /** Voice script text to display */
+  scriptText: string
+  /** Platform-specific script variants */
+  scriptVariants?: {
+    platform: Platform
+    hasHomebrew?: boolean
+    text: string
+  }[]
+  /** Command to display (if applicable) */
+  command?: string
+  /** Command description */
+  commandDescription?: string
+  /** Whether step requires detection before proceeding */
+  requiresDetection?: boolean
+  /** Setup state key to check for detection */
+  detectionKey?: keyof SetupState
+  /** Estimated time to complete (for screen reader context) */
+  estimatedTime?: string
+}
+
+/**
+ * ARIA live region configuration
+ */
+export interface LiveRegionConfig {
+  /** Type of live region */
+  type: 'polite' | 'assertive' | 'off'
+  /** Whether to announce the entire region on updates */
+  atomic: boolean
+  /** Which parts of the region to announce */
+  relevant?: 'additions' | 'removals' | 'text' | 'all'
+}
+
+/** Default live region configuration */
+export const DEFAULT_LIVE_REGION: LiveRegionConfig = {
+  type: 'polite',
+  atomic: true,
+  relevant: 'additions',
+}
