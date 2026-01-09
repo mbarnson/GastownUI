@@ -6,6 +6,7 @@ import {
   type FTUEStep,
   type FTUEProgress,
   createInitialState,
+  createEmptySetupState,
   determineStartStep,
   FTUE_STORAGE_KEY,
 } from './types'
@@ -38,6 +39,40 @@ function ftueReducerCore(state: FTUEState, action: FTUEAction): FTUEState {
         ...state,
         step,
         setupState: action.setupState,
+      }
+    }
+
+    case 'RESUME': {
+      // Resume from where the user left off
+      if (!state.previousProgress) {
+        // No previous progress, go to checking
+        return {
+          ...state,
+          step: 'checking_prerequisites',
+          previousProgress: undefined,
+        }
+      }
+
+      // Go to checking_prerequisites to re-detect current state
+      // The detected state will determine the actual step to resume from
+      return {
+        ...state,
+        step: 'checking_prerequisites',
+        customPath: state.previousProgress.customPath,
+        // Keep previousProgress so we can show context in UI if needed
+      }
+    }
+
+    case 'START_FRESH': {
+      // Clear persisted progress and start from the beginning
+      clearPersistedProgress()
+      return {
+        step: 'checking_prerequisites',
+        setupState: createEmptySetupState(),
+        errorCount: 0,
+        voiceEnabled: state.voiceEnabled, // Preserve voice preference
+        startedAt: new Date(),
+        previousProgress: undefined,
       }
     }
 
@@ -168,6 +203,16 @@ function ftueReducerCore(state: FTUEState, action: FTUEAction): FTUEState {
 
       if (response.includes('skip')) {
         return ftueReducerCore(state, { type: 'SKIP' })
+      }
+
+      // Handle resume-related responses
+      if (state.step === 'resuming') {
+        if (response.includes('continue') || response.includes('resume') || response.includes('pick up')) {
+          return ftueReducerCore(state, { type: 'RESUME' })
+        }
+        if (response.includes('fresh') || response.includes('start over')) {
+          return ftueReducerCore(state, { type: 'START_FRESH' })
+        }
       }
 
       // Default: stay in current state

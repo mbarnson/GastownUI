@@ -14,6 +14,8 @@ import type { VoiceClip } from './audio'
  * Voice clip identifier
  */
 export type VoiceClipId =
+  | 'welcome'
+  | 'resuming'
   | 'download_starting'
   | 'checking_go'
   | 'go_found'
@@ -58,6 +60,22 @@ export const VOICE_ASSETS_PATH = '/assets/voice/ftue'
  * All FTUE voice clips with scripts
  */
 export const FTUE_VOICE_CLIPS: Record<VoiceClipId, VoiceClipMeta> = {
+  welcome: {
+    id: 'welcome',
+    src: `${VOICE_ASSETS_PATH}/00_welcome.wav`,
+    filename: '00_welcome.wav',
+    script: `Hey there! I'm your Gas Town assistant. I'll be helping you get set up—it usually takes about five minutes. Before we start, I should mention: Gas Town is designed for developers who are comfortable in the terminal and ready to run multiple AI coding agents in parallel. It's powerful, but it does use real API credits. If that sounds like what you're looking for, let's get started. Say "let's go" when you're ready, or "tell me more" if you want to know what we're setting up.`,
+    estimatedDuration: 25,
+  },
+
+  resuming: {
+    id: 'resuming',
+    src: `${VOICE_ASSETS_PATH}/00_resuming.wav`,
+    filename: '00_resuming.wav',
+    script: `Welcome back! Looks like we didn't finish setting up last time. No worries—we can pick up right where you left off. Would you like to continue from where we were, or start fresh?`,
+    estimatedDuration: 10,
+  },
+
   download_starting: {
     id: 'download_starting',
     src: `${VOICE_ASSETS_PATH}/01_download_starting.wav`,
@@ -284,6 +302,7 @@ export async function checkVoiceAssetsAvailable(): Promise<boolean> {
  * Voice clip playback order for linear FTUE flow
  */
 export const FTUE_CLIP_SEQUENCE: VoiceClipId[] = [
+  'welcome', // OR 'resuming' if interrupted session detected
   'download_starting',
   'checking_go',
   // Then branch based on detection:
