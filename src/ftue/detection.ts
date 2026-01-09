@@ -7,6 +7,14 @@ import { MIN_VERSIONS } from './types'
 
 const POLL_INTERVAL = 3000 // 3 seconds
 
+/** Result from gt commands */
+interface GtCommandResult {
+  success: boolean
+  stdout: string
+  stderr: string
+  exit_code: number
+}
+
 /** Compare semver versions */
 function compareVersions(a: string, b: string): number {
   const partsA = a.split('.').map(Number)
@@ -21,14 +29,21 @@ function compareVersions(a: string, b: string): number {
   return 0
 }
 
+/** Result from run_gt_command */
+interface CommandResult {
+  stdout: string
+  stderr: string
+  exit_code: number
+}
+
 /** Run a command and get stdout */
 async function runCommand(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   try {
-    const result = await invoke<{ stdout: string; stderr: string }>('run_command', {
+    const result = await invoke<CommandResult>('run_gt_command', {
       cmd,
       args,
     })
-    return result
+    return { stdout: result.stdout, stderr: result.stderr }
   } catch (error) {
     throw new Error(`Command failed: ${cmd} ${args.join(' ')}: ${error}`)
   }
@@ -270,18 +285,13 @@ export class SetupDetector {
   /** Create a new Gas Town workspace */
   async createWorkspace(path: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Expand ~ to home directory
-      let resolvedPath = path
-      if (path.startsWith('~/')) {
-        const home = await homeDir()
-        resolvedPath = await join(home, path.slice(2))
-      }
+      // Call gt_install Tauri command (handles ~ expansion internally)
+      const result = await invoke<GtCommandResult>('gt_install', {
+        path,
+        withGit: false,
+      })
 
-      // Run gt install to create the workspace
-      const result = await runCommand('gt', ['install', resolvedPath])
-
-      // Check if workspace was created successfully
-      if (await this.isWorkspace(resolvedPath)) {
+      if (result.success) {
         return { success: true }
       }
 
@@ -303,11 +313,14 @@ export class SetupDetector {
       // Parse rig name from URL
       const rigName = gitUrl.split('/').pop()?.replace('.git', '') || 'project'
 
-      // Run gt rig add
-      const result = await runCommand('gt', ['rig', 'add', rigName, gitUrl])
+      // Call gt_rig_add Tauri command
+      const result = await invoke<GtCommandResult>('gt_rig_add', {
+        name: rigName,
+        url: gitUrl,
+      })
 
-      if (result.stderr && result.stderr.toLowerCase().includes('error')) {
-        return { success: false, error: result.stderr }
+      if (!result.success) {
+        return { success: false, error: result.stderr || 'Failed to add rig' }
       }
 
       return { success: true, rigName }
@@ -322,10 +335,11 @@ export class SetupDetector {
   /** Start the Mayor agent */
   async startMayor(): Promise<{ success: boolean; error?: string }> {
     try {
-      const result = await runCommand('gt', ['mayor', 'start'])
+      // Call gt_mayor_start Tauri command
+      const result = await invoke<GtCommandResult>('gt_mayor_start')
 
-      if (result.stderr && result.stderr.toLowerCase().includes('error')) {
-        return { success: false, error: result.stderr }
+      if (!result.success) {
+        return { success: false, error: result.stderr || 'Failed to start mayor' }
       }
 
       return { success: true }
